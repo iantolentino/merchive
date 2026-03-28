@@ -42,32 +42,34 @@
 
     <div class="grid" id="video-grid"></div>
 
-    <script>
-        const token = localStorage.getItem('access_token');
-        
-        function logout() {
-            localStorage.removeItem('access_token');
-            window.location.href = '/login';
-        }
+<script>
+    const token = localStorage.getItem('access_token');
+    
+    function logout() {
+        localStorage.removeItem('access_token');
+        window.location.href = '/login';
+    }
 
-        function closePlayer() {
-            const player = document.getElementById('main-player');
-            player.pause();
-            player.src = "";
-            document.getElementById('player-container').style.display = 'none';
-        }
+    function closePlayer() {
+        const player = document.getElementById('main-player');
+        player.pause();
+        player.src = "";
+        player.load(); // Forces the browser to dump the previous stream buffer
+        document.getElementById('player-container').style.display = 'none';
+    }
 
-        async function deleteVideo(id, event) {
-            event.stopPropagation();
-            if (!confirm("DELETE VIDEO?")) return;
-            const res = await fetch(`/api/videos/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) location.reload();
-        }
+    async function deleteVideo(id, event) {
+        event.stopPropagation();
+        if (!confirm("DELETE VIDEO?")) return;
+        const res = await fetch(`/api/videos/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) location.reload();
+    }
 
-        async function loadArchive() {
+    async function loadArchive() {
+        try {
             const res = await fetch('/api/videos/list');
             const result = await res.json();
             const container = document.getElementById('video-grid');
@@ -86,20 +88,39 @@
                     </div>
                 `;
                 
-                // Show delete buttons if logged in
                 if(token) card.querySelector('.delete-btn').style.display = 'block';
 
                 card.onclick = () => {
                     const player = document.getElementById('main-player');
-                    document.getElementById('player-container').style.display = 'block';
+                    const container = document.getElementById('player-container');
+                    
+                    container.style.display = 'block';
+                    
+                    // 1. Reset player state
+                    player.pause();
+                    player.removeAttribute('src');
+                    player.load(); 
+
+                    // 2. Assign new stream URL
                     player.src = `/api/video/stream/${msgId}`;
-                    player.play();
+                    
+                    // 3. Robust Playback Trigger
+                    player.load(); 
+                    player.play().catch(e => {
+                        console.log("Autoplay prevented, trying muted...");
+                        player.muted = true;
+                        player.play();
+                    });
+
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
                 container.appendChild(card);
             });
+        } catch (err) {
+            console.error("Failed to load archive:", err);
         }
-        loadArchive();
-    </script>
+    }
+    loadArchive();
+</script>
 </body>
 </html>
