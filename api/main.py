@@ -38,3 +38,18 @@ async def check_db(admin_data: dict = Depends(verify_admin)):
     except Exception as e:
         logger.error(f"Database check failed: {e}")
         raise HTTPException(status_code=500, detail="Database connection error.")
+    
+    
+@app.get("/api/video/stream/{message_id}")
+async def video_stream(message_id: str):
+    """
+    This endpoint acts as the video source for the browser player.
+    """
+    return StreamingResponse(
+        stream_telegram_file(message_id),
+        media_type="video/mp4",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Type": "video/mp4",
+        }
+    )
