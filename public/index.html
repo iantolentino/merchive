@@ -94,33 +94,31 @@
                     const player = document.getElementById('main-player');
                     const container = document.getElementById('player-container');
                     
-                    // 1. Show the container first
                     container.style.display = 'block';
-                    
-                    // 2. Clear previous state to prevent "Source Not Supported" conflict
                     player.pause();
-                    player.src = ""; 
+                    player.src = ""; // Clear old buffer
                     player.load();
                 
-                    // 3. Set the new stream URL
-                    player.src = `/api/video/stream/${msgId}`;
+                    const streamUrl = `/api/video/stream/${msgId}`;
+                    player.src = streamUrl;
                 
-                    // 4. WAIT for the browser to acknowledge the stream exists
                     player.oncanplay = () => {
-                        player.play().catch(e => {
-                            console.log("Autoplay blocked, trying muted...");
+                        player.play().catch(() => {
                             player.muted = true;
                             player.play();
                         });
-                        // Remove listener so it doesn't trigger multiple times
-                        player.oncanplay = null;
                     };
                 
-                    // 5. Handle stream errors immediately
                     player.onerror = () => {
-                        console.error("Stream Error Code:", player.error.code);
-                        alert("STREAM_CONNECTION_TIMEOUT: Please try again in a moment.");
+                        // Error 4 is usually a server-side timeout or 404
+                        console.error("Vesta_Stream_Error:", player.error.code);
+                        if(player.error.code === 4) {
+                            console.warn("Check Vercel Logs: The server likely timed out connecting to Telegram.");
+                        }
                     };
+                
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
                 
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
