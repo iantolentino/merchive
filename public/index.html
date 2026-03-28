@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VESTA // MERCHIVE</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22black%22/><text y=%22.9em%22 font-size=%2280%22>📼</text></svg>">
     <style>
         body { 
             background: #050505; 
@@ -74,6 +75,18 @@
             display: none; 
             border: 1px solid #333; 
             background: #000;
+        }
+        .card-thumb {
+            width: 100%;
+            height: 150px;
+            background: #111; /* Dark background */
+            object-fit: cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            font-size: 0.7rem;
+            border-bottom: 1px solid #222;
         }
         video { width: 100%; display: block; max-height: 600px; }
         .error-msg { color: #ff4444; border: 1px solid #442222; padding: 15px; }
@@ -153,19 +166,42 @@
 
                         card.innerHTML = `
                             <button class="delete-btn" onclick="deleteVideo('${video.id}', event)">×</button>
-                            <span class="badge">${video.category || 'GENERAL'}</span>
-                            <h3>${video.title || 'Untitled'}</h3>
-                            <p style="color: #333; font-size: 0.6rem;">MSG_REF: ${msgId}</p>
+                            <div class="thumb-container" style="position: relative; height: 150px; background: #111;">
+                                <img src="/api/video/thumbnail/${msgId}" 
+                                    class="card-thumb" 
+                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+                                    onerror="this.style.display='none'">
+                                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #222; font-size: 0.6rem;">
+                                    [ NO_PREVIEW_AVAILABLE ]
+                                </div>
+                            </div>
+                            <div style="padding: 15px;">
+                                <span class="badge">${video.category || 'GENERAL'}</span>
+                                <h3>${video.title || 'Untitled'}</h3>
+                            </div>
                         `;
-                        
+                                                
                         card.onclick = () => {
                             if (!msgId) return alert("NO_ID_FOUND");
                             const container = document.getElementById('player-container');
                             const player = document.getElementById('main-player');
+                            
                             container.style.display = 'block';
-                            player.src = `/api/video/stream/${msgId}`;
+                            
+                            // Clear the player first to reset the state
+                            player.pause();
+                            player.removeAttribute('src'); 
                             player.load();
-                            player.play();
+
+                            // Set the new source with a type hint
+                            player.src = `/api/video/stream/${msgId}`;
+                            player.type = 'video/mp4';
+                            
+                            player.play().catch(e => {
+                                console.error("Playback failed:", e);
+                                alert("STREAM_ERROR: Check terminal for Telegram connection status.");
+                            });
+
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                         };
                         

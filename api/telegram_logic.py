@@ -39,3 +39,27 @@ async def stream_telegram_file(message_id: str):
             
     except Exception as e:
         logger.error(f"🚨 Telegram Streaming Error: {e}")
+
+async def get_video_thumbnail(message_id: str):
+    tg = await get_tg_client()
+    try:
+        message = await tg.get_messages(CHANNEL_ID, ids=int(message_id))
+        
+        if not message or not message.media:
+            return None
+
+        # 1. Try standard video thumbnails
+        if hasattr(message, 'video') and message.video and message.video.thumbs:
+            return await tg.download_media(message.video.thumbs[-1], file=bytes)
+
+        # 2. Try document (file) thumbnails
+        if hasattr(message.media, 'document') and message.media.document.thumbs:
+            return await tg.download_media(message.media.document.thumbs[-1], file=bytes)
+
+        # 3. Final Catch-All: Try downloading a 'thumb' version of the media itself
+        # This works if Telegram generated a generic preview
+        return await tg.download_media(message.media, file=bytes, thumb=-1)
+        
+    except Exception as e:
+        logger.error(f"🚨 Thumbnail Error for Msg {message_id}: {e}")
+        return None

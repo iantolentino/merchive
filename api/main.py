@@ -4,10 +4,11 @@ from api.database import supabase
 from api.models import LoginRequest, TokenResponse
 from api.auth import ADMIN_SECRET, create_access_token, verify_admin
 from fastapi.responses import StreamingResponse, FileResponse
-from api.telegram_logic import stream_telegram_file
+from api.telegram_logic import stream_telegram_file, get_video_thumbnail
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List
+from fastapi import Response
 
 # --- Models ---
 class VideoCreate(BaseModel):
@@ -93,6 +94,21 @@ async def video_stream(message_id: str):
             "Cache-Control": "no-cache",
         }
     )
+
+# --- Thumbnaio route ---
+@app.get("/api/video/thumbnail/{message_id}")
+async def video_thumbnail(message_id: str):
+    try:
+        thumb_bytes = await get_video_thumbnail(message_id)
+        if not thumb_bytes:
+            # If no thumb found, return 404 so the HTML 'onerror' can handle it
+            raise HTTPException(status_code=404, detail="No thumbnail available")
+        
+        return Response(content=thumb_bytes, media_type="image/jpeg")
+    except Exception as e:
+        logger.error(f"Thumbnail route crashed: {e}")
+        # Return 404 instead of 500 to prevent console spam
+        raise HTTPException(status_code=404, detail="Error fetching thumbnail")
 
 # --- System & Page Routes ---
 
