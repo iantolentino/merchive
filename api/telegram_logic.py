@@ -22,22 +22,20 @@ async def get_tg_client():
 async def stream_telegram_file(message_id: str):
     tg = await get_tg_client()
     try:
-        # Fetch the message
+        # 1. Fetch the message from your channel
         message = await tg.get_messages(CHANNEL_ID, ids=int(message_id))
         
-        # Check if message exists and has a file (Document or Video)
-        if not message or not message.file:
-            logger.error(f"No file found in Telegram for ID: {message_id}")
-            yield b""
+        if not message or not message.media:
+            logger.error(f"❌ No media found in Telegram message ID: {message_id}")
             return
 
-        # LOG THE FILE TYPE for debugging
-        logger.info(f"Streaming file: {message.file.name or 'Unknown'} | Size: {message.file.size} bytes")
+        logger.info(f"🎥 Starting stream: Message {message_id}")
 
-        # Stream the file data
+        # 2. Use iter_download but point directly to the media object
+        # This is the most stable way to stream to a browser
         async for chunk in tg.iter_download(message.media, chunk_size=1024*1024):
-            yield chunk
+            if chunk:
+                yield chunk
             
     except Exception as e:
-        logger.error(f"Telegram Streaming Error: {e}")
-        yield b""
+        logger.error(f"🚨 Telegram Streaming Error: {e}")

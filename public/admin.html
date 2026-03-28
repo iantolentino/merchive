@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VESTA // ADMIN PANEL</title>
+    <style>
+        body { background: #000; color: #fff; font-family: monospace; padding: 50px; }
+        .form-group { margin-bottom: 20px; border: 1px solid #222; padding: 20px; max-width: 400px; }
+        input { background: #111; border: 1px solid #333; color: #fff; padding: 10px; width: 90%; margin-top: 10px; }
+        button { background: #fff; color: #000; border: none; padding: 10px; cursor: pointer; width: 95%; margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>ARCHIVE_REGISTRY</h1>
+    <div class="form-group">
+        <label>VIDEO_TITLE</label><br>
+        <input type="text" id="title" placeholder="e.g. School Test Video">
+        <br><br>
+        <label>CATEGORY</label><br>
+        <input type="text" id="category" placeholder="e.g. School">
+        <br><br>
+        <label>TELEGRAM_MSG_ID</label><br>
+        <input type="text" id="msg_id" placeholder="e.g. 5">
+        <button onclick="registerVideo()">SUBMIT_TO_DATABASE</button>
+    </div>
+
+    <script>
+        async function registerVideo() {
+            const token = localStorage.getItem('access_token');
+            const payload = {
+                title: document.getElementById('title').value,
+                category: document.getElementById('category').value,
+                tg_file_ids: [document.getElementById('msg_id').value],
+                is_private: false
+            };
+
+            const res = await fetch('/api/videos/add', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                alert("SUCCESS: ARCHIVE UPDATED");
+                window.location.href = "/";
+            } else {
+                alert("ERROR: FAILED TO UPDATE");
+            }
+        }
+    </script>
+</body>
+</html>

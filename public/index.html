@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VESTA // MERCHIVE</title>
+    <style>
+        body { 
+            background: #050505; 
+            color: #eee; 
+            font-family: 'Courier New', monospace; 
+            padding: 40px; 
+            margin: 0;
+        }
+        .header { 
+            border-bottom: 1px solid #222; 
+            margin-bottom: 30px; 
+            padding-bottom: 10px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .nav-links a {
+            color: #666;
+            text-decoration: none;
+            font-size: 0.8rem;
+            margin-left: 20px;
+        }
+        .nav-links a:hover { color: #fff; }
+
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+            gap: 20px; 
+        }
+        .video-card { 
+            border: 1px solid #222; 
+            padding: 20px; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            background: #0a0a0a;
+            position: relative;
+        }
+        .video-card:hover { 
+            border-color: #555; 
+            background: #111; 
+        }
+        .video-card h3 { 
+            font-size: 1rem; 
+            margin: 10px 0; 
+            color: #fff; 
+        }
+        .badge { 
+            font-size: 0.65rem; 
+            background: #1a1a1a; 
+            padding: 3px 8px; 
+            border: 1px solid #333;
+            color: #888;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #444;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        .delete-btn:hover { color: #ff4444; }
+
+        #player-container { 
+            margin-bottom: 50px; 
+            display: none; 
+            border: 1px solid #333; 
+            background: #000;
+        }
+        video { width: 100%; display: block; max-height: 600px; }
+        .error-msg { color: #ff4444; border: 1px solid #442222; padding: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>PROJECT VESTA // MERCHIVE</h1>
+            <p style="color: #444; font-size: 0.7rem;">STATUS: <span id="sys-status" style="color: #0f0;">ONLINE</span></p>
+        </div>
+        <div class="nav-links">
+            <a href="/admin">+ ADD_VIDEO</a>
+            <a href="#" onclick="logout()">[ LOGOUT ]</a>
+        </div>
+    </div>
+
+    <div id="player-container">
+        <video id="main-player" controls preload="auto">
+            <source id="video-source" src="" type="video/mp4">
+        </video>
+    </div>
+
+    <div class="grid" id="video-grid">
+        <p>INITIALIZING_ARCHIVE_DATA...</p>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('access_token');
+
+        function logout() {
+            localStorage.removeItem('access_token');
+            window.location.href = '/login';
+        }
+
+        async function deleteVideo(id, event) {
+            event.stopPropagation(); // Don't trigger the video play
+            if (!confirm("CONFIRM_DELETION: Proceed?")) return;
+
+            try {
+                const res = await fetch(`/api/videos/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    alert("DELETE_FAILED");
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function loadArchive() {
+            const grid = document.getElementById('video-grid');
+
+            if (!token) {
+                grid.innerHTML = '<div class="error-msg">ACCESS_DENIED. <a href="/login" style="color:#fff">LOGIN_REQUIRED</a></div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/videos/list', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await response.json();
+
+                if (result.status === 'success' && result.data.length > 0) {
+                    grid.innerHTML = '';
+                    
+                    result.data.forEach(video => {
+                        const card = document.createElement('div');
+                        card.className = 'video-card';
+                        const msgId = (video.tg_file_ids && video.tg_file_ids.length > 0) ? video.tg_file_ids[0] : null;
+
+                        card.innerHTML = `
+                            <button class="delete-btn" onclick="deleteVideo('${video.id}', event)">×</button>
+                            <span class="badge">${video.category || 'GENERAL'}</span>
+                            <h3>${video.title || 'Untitled'}</h3>
+                            <p style="color: #333; font-size: 0.6rem;">MSG_REF: ${msgId}</p>
+                        `;
+                        
+                        card.onclick = () => {
+                            if (!msgId) return alert("NO_ID_FOUND");
+                            const container = document.getElementById('player-container');
+                            const player = document.getElementById('main-player');
+                            container.style.display = 'block';
+                            player.src = `/api/video/stream/${msgId}`;
+                            player.load();
+                            player.play();
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        };
+                        
+                        grid.appendChild(card);
+                    });
+                } else {
+                    grid.innerHTML = '<p>ARCHIVE_EMPTY. Visit /admin to add content.</p>';
+                }
+            } catch (err) {
+                grid.innerHTML = `<p class="error-msg">SYSTEM_FAILURE: ${err.message}</p>`;
+            }
+        }
+
+        loadArchive();
+    </script>
+</body>
+</html>
