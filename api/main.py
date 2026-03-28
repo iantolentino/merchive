@@ -1,5 +1,6 @@
 import os
-from fastapi import FastAPI, HTTPException, Depends
+import asyncio
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -24,17 +25,23 @@ class VideoCreate(BaseModel):
 
 app = FastAPI(title="Project Vesta // MC")
 
+# --- BOT CONNECTION HELPER ---
+async def ensure_connected():
+    """Ensures the Telegram client is alive before any operation."""
+    if not client.is_connected():
+        logger.info("Connecting to Telegram...")
+        await client.start(bot_token=BOT_TOKEN)
+    return True
+
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Initializing MC Dashboard (Bot Mode)...")
     try:
-        if not client.is_connected():
-            await client.start(bot_token=BOT_TOKEN)
+        await ensure_connected()
         logger.info("✅ TELEGRAM_BOT: ONLINE.")
     except Exception as e:
         logger.error(f"❌ STARTUP_ERROR: {e}")
 
-# --- AUTH ROUTES ---
+# --- AUTH & ADMIN ROUTES ---
 @app.post("/api/auth/login", response_model=TokenResponse)
 async def login(req: LoginRequest):
     if req.password != ADMIN_SECRET:
@@ -42,7 +49,6 @@ async def login(req: LoginRequest):
     token = create_access_token(data={"role": "admin"})
     return {"access_token": token, "token_type": "bearer"}
 
-# --- ADMIN CRUD ROUTES ---
 @app.post("/api/videos/add")
 async def add_video(video: VideoCreate, admin_data: dict = Depends(verify_admin)):
     try:
@@ -74,33 +80,35 @@ async def list_videos():
     return {"status": "success", "data": response.data}
 
 @app.get("/api/video/stream/{message_id}")
-async def video_stream(message_id: str):
+async def video_stream(message_id: str, request: Request):
     try:
-        # ENSURE CONNECTION: Vercel functions are ephemeral.
-        # We check connection right before streaming.
-        if not client.is_connected():
-            await client.start(bot_token=BOT_TOKEN)
+        # 1. Force connection check
+        await ensure_connected()
 
         async def file_generator():
-            # Send a tiny empty byte to keep the connection alive while searching Telegram
+            # 2. HEARTBEAT: Send a single empty byte immediately.
+            # This prevents Vercel/Browsers from timing out while 
+            # Telethon is fetching the file metadata.
             yield b"" 
+            
             async for chunk in stream_telegram_file(message_id):
                 if chunk:
                     yield chunk
 
+        # 3. Add 'Accept-Ranges' to satisfy Chrome/Safari players
         return StreamingResponse(
             file_generator(),
             media_type="video/mp4",
             headers={
-                "accept-ranges": "bytes",
-                "content-type": "video/mp4",
-                "cache-control": "no-cache",
-                "connection": "keep-alive"
+                "Accept-Ranges": "bytes",
+                "Content-Type": "video/mp4",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
             }
         )
     except Exception as e:
-        logger.error(f"STREAM_INIT_ERROR: {e}")
-        raise HTTPException(status_code=500, detail="Stream initialization failed")
+        logger.error(f"STREAM_INIT_ERROR for {message_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Stream Error: {str(e)}")
 
 # --- PAGE ROUTES ---
 @app.get("/")
@@ -115,6 +123,5 @@ async def get_login_page():
 async def get_admin_page():
     return FileResponse(os.path.join(PUBLIC_PATH, "admin.html"))
 
-# Mounting static files last
 if os.path.exists(PUBLIC_PATH):
     app.mount("/static", StaticFiles(directory=PUBLIC_PATH), name="static")
