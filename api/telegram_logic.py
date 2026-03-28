@@ -20,21 +20,22 @@ async def get_tg_client():
     return client
 
 async def stream_telegram_file(message_id: str):
-    """
-    The 'Pipe': It fetches a video from Telegram by ID 
-    and yields it in 1MB chunks to the frontend.
-    """
     tg = await get_tg_client()
     try:
+        # Fetch the message
         message = await tg.get_messages(CHANNEL_ID, ids=int(message_id))
         
+        # Check if message exists and has a file (Document or Video)
         if not message or not message.file:
             logger.error(f"No file found in Telegram for ID: {message_id}")
             yield b""
             return
 
-        # Stream the file data so it plays instantly
-        async for chunk in tg.iter_download(message.file, chunk_size=1024*1024):
+        # LOG THE FILE TYPE for debugging
+        logger.info(f"Streaming file: {message.file.name or 'Unknown'} | Size: {message.file.size} bytes")
+
+        # Stream the file data
+        async for chunk in tg.iter_download(message.media, chunk_size=1024*1024):
             yield chunk
             
     except Exception as e:

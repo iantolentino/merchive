@@ -3,6 +3,8 @@ from loguru import logger
 from api.database import supabase
 from api.models import LoginRequest, TokenResponse
 from api.auth import ADMIN_SECRET, create_access_token, verify_admin
+from fastapi.responses import StreamingResponse
+from api.telegram_logic import stream_telegram_file
 
 # Initialize FastAPI
 app = FastAPI(title="Project Vesta API", version="1.0.0")
