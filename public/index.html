@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VESTA // MERCHIVE</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22black%22/><text y=%22.9em%22 font-size=%2280%22>📼</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22black%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22central%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22monospace%22 font-weight=%22bold%22 font-size=%2260%22>MC</text></svg>">
+    
     <style>
         body { 
             background: #050505; 
@@ -29,6 +30,38 @@
         }
         .nav-links a:hover { color: #fff; }
 
+        /* Video Player Container */
+        #player-container {
+            position: relative;
+            margin-bottom: 50px;
+            display: none;
+            border: 1px solid #333;
+            background: #000;
+            width: 100%;
+        }
+
+        .close-player-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            border: 1px solid #444;
+            width: 35px;
+            height: 35px;
+            cursor: pointer;
+            z-index: 100;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .close-player-btn:hover { background: #fff; color: #000; }
+
+        video { width: 100%; display: block; max-height: 70vh; }
+
+        /* Grid & Cards */
         .grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
@@ -36,59 +69,53 @@
         }
         .video-card { 
             border: 1px solid #222; 
-            padding: 20px; 
             cursor: pointer; 
             transition: all 0.3s ease; 
             background: #0a0a0a;
             position: relative;
+            overflow: hidden;
         }
         .video-card:hover { 
             border-color: #555; 
             background: #111; 
         }
         .video-card h3 { 
-            font-size: 1rem; 
-            margin: 10px 0; 
+            font-size: 0.9rem; 
+            margin: 10px 0 0 0; 
             color: #fff; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         .badge { 
-            font-size: 0.65rem; 
+            font-size: 0.6rem; 
             background: #1a1a1a; 
-            padding: 3px 8px; 
+            padding: 2px 6px; 
             border: 1px solid #333;
-            color: #888;
+            color: #666;
+            text-transform: uppercase;
         }
         .delete-btn {
             position: absolute;
             top: 10px;
             right: 10px;
-            background: none;
+            background: rgba(0,0,0,0.5);
             border: none;
             color: #444;
             cursor: pointer;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
+            z-index: 5;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
         }
-        .delete-btn:hover { color: #ff4444; }
+        .delete-btn:hover { color: #ff4444; background: #000; }
 
-        #player-container { 
-            margin-bottom: 50px; 
-            display: none; 
-            border: 1px solid #333; 
-            background: #000;
-        }
         .card-thumb {
             width: 100%;
-            height: 150px;
-            background: #111; /* Dark background */
+            height: 160px;
             object-fit: cover;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #333;
-            font-size: 0.7rem;
             border-bottom: 1px solid #222;
         }
-        video { width: 100%; display: block; max-height: 600px; }
         .error-msg { color: #ff4444; border: 1px solid #442222; padding: 15px; }
     </style>
 </head>
@@ -106,6 +133,7 @@
     </div>
 
     <div id="player-container">
+        <button class="close-player-btn" onclick="closePlayer()">×</button>
         <video id="main-player" controls preload="auto">
             <source id="video-source" src="" type="video/mp4">
         </video>
@@ -123,8 +151,17 @@
             window.location.href = '/login';
         }
 
+        function closePlayer() {
+            const container = document.getElementById('player-container');
+            const player = document.getElementById('main-player');
+            player.pause();
+            player.src = ""; // Stop the download stream
+            player.load();
+            container.style.display = 'none';
+        }
+
         async function deleteVideo(id, event) {
-            event.stopPropagation(); // Don't trigger the video play
+            event.stopPropagation();
             if (!confirm("CONFIRM_DELETION: Proceed?")) return;
 
             try {
@@ -166,18 +203,17 @@
 
                         card.innerHTML = `
                             <button class="delete-btn" onclick="deleteVideo('${video.id}', event)">×</button>
-                            <div class="thumb-container" style="position: relative; height: 150px; background: #111;">
+                            <div style="position: relative; height: 160px; background: #080808;">
                                 <img src="/api/video/thumbnail/${msgId}" 
                                     class="card-thumb" 
-                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
                                     onerror="this.style.display='none'">
-                                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #222; font-size: 0.6rem;">
-                                    [ NO_PREVIEW_AVAILABLE ]
+                                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #222; font-size: 0.5rem; letter-spacing: 2px;">
+                                    NO_SIGNAL
                                 </div>
                             </div>
                             <div style="padding: 15px;">
-                                <span class="badge">${video.category || 'GENERAL'}</span>
-                                <h3>${video.title || 'Untitled'}</h3>
+                                <span class="badge">${video.category || 'RAW_DATA'}</span>
+                                <h3>${video.title || 'UNTITLED_LOG'}</h3>
                             </div>
                         `;
                                                 
@@ -188,18 +224,15 @@
                             
                             container.style.display = 'block';
                             
-                            // Clear the player first to reset the state
                             player.pause();
                             player.removeAttribute('src'); 
                             player.load();
 
-                            // Set the new source with a type hint
                             player.src = `/api/video/stream/${msgId}`;
                             player.type = 'video/mp4';
                             
                             player.play().catch(e => {
                                 console.error("Playback failed:", e);
-                                alert("STREAM_ERROR: Check terminal for Telegram connection status.");
                             });
 
                             window.scrollTo({ top: 0, behavior: 'smooth' });
