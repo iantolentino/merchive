@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLAYBACK // MERCHIVE</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22black%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22central%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22monospace%22 font-weight=%22bold%22 font-size=%2260%22>MC</text></svg>">
+    <style>
+        body { background: #000; color: #fff; font-family: 'Courier New', monospace; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        video { width: 100%; border: 1px solid #222; background: #0a0a0a; }
+        .meta { margin-top: 20px; border-top: 1px solid #222; padding-top: 20px; }
+        .back-link { color: #555; text-decoration: none; font-size: 0.8rem; }
+        .back-link:hover { color: #fff; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <a href="/" class="back-link">← EXIT_PLAYER</a>
+        <div style="margin: 20px 0;">
+            <video id="player" controls autoplay>
+                <source id="video-source" src="" type="video/mp4">
+            </video>
+        </div>
+        <div class="meta">
+            <h1 id="video-title" style="font-size: 1.2rem; letter-spacing: 1px;">LOADING_METADATA...</h1>
+            <p id="video-category" style="color: #666; font-size: 0.8rem;"></p>
+        </div>
+    </div>
+
+    <script>
+        // Get the ID from the URL (e.g., player.html?id=4)
+        const urlParams = new URLSearchParams(window.location.search);
+        const videoId = urlParams.get('id');
+
+        if (!videoId) {
+            document.getElementById('video-title').innerText = "ERROR: NO_VIDEO_ID";
+        } else {
+            // Set the video stream source
+            const player = document.getElementById('player');
+            player.src = `/api/video/stream/${videoId}`;
+            
+            // Note: If you want to fetch the title, you'd add a 
+            // GET /api/videos/{id} route to your main.py.
+            document.getElementById('video-title').innerText = `STREAMING_ID: ${videoId}`;
+        }
+    </script>
+</body>
+</html>

@@ -2,121 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VESTA // MERCHIVE</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22black%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22central%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22monospace%22 font-weight=%22bold%22 font-size=%2260%22>MC</text></svg>">
-    
     <style>
-        body { 
-            background: #050505; 
-            color: #eee; 
-            font-family: 'Courier New', monospace; 
-            padding: 40px; 
-            margin: 0;
-        }
-        .header { 
-            border-bottom: 1px solid #222; 
-            margin-bottom: 30px; 
-            padding-bottom: 10px; 
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-        }
-        .nav-links a {
-            color: #666;
-            text-decoration: none;
-            font-size: 0.8rem;
-            margin-left: 20px;
-        }
+        body { background: #050505; color: #eee; font-family: 'Courier New', monospace; padding: 40px; margin: 0; }
+        .header { border-bottom: 1px solid #222; margin-bottom: 30px; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .nav-links a { color: #666; text-decoration: none; font-size: 0.8rem; margin-left: 20px; cursor: pointer; }
         .nav-links a:hover { color: #fff; }
-
-        /* Video Player Container */
-        #player-container {
-            position: relative;
-            margin-bottom: 50px;
-            display: none;
-            border: 1px solid #333;
-            background: #000;
-            width: 100%;
-        }
-
-        .close-player-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(0, 0, 0, 0.7);
-            color: #fff;
-            border: 1px solid #444;
-            width: 35px;
-            height: 35px;
-            cursor: pointer;
-            z-index: 100;
-            font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-        .close-player-btn:hover { background: #fff; color: #000; }
-
+        #player-container { position: relative; margin-bottom: 50px; display: none; border: 1px solid #333; background: #000; width: 100%; }
         video { width: 100%; display: block; max-height: 70vh; }
-
-        /* Grid & Cards */
-        .grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
-            gap: 20px; 
-        }
-        .video-card { 
-            border: 1px solid #222; 
-            cursor: pointer; 
-            transition: all 0.3s ease; 
-            background: #0a0a0a;
-            position: relative;
-            overflow: hidden;
-        }
-        .video-card:hover { 
-            border-color: #555; 
-            background: #111; 
-        }
-        .video-card h3 { 
-            font-size: 0.9rem; 
-            margin: 10px 0 0 0; 
-            color: #fff; 
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .badge { 
-            font-size: 0.6rem; 
-            background: #1a1a1a; 
-            padding: 2px 6px; 
-            border: 1px solid #333;
-            color: #666;
-            text-transform: uppercase;
-        }
-        .delete-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.5);
-            border: none;
-            color: #444;
-            cursor: pointer;
-            font-size: 1.1rem;
-            z-index: 5;
-            width: 25px;
-            height: 25px;
-            border-radius: 50%;
-        }
-        .delete-btn:hover { color: #ff4444; background: #000; }
-
-        .card-thumb {
-            width: 100%;
-            height: 160px;
-            object-fit: cover;
-            border-bottom: 1px solid #222;
-        }
-        .error-msg { color: #ff4444; border: 1px solid #442222; padding: 15px; }
+        .close-btn { position: absolute; top: 15px; right: 15px; background: #fff; color: #000; border: none; width: 30px; height: 30px; cursor: pointer; z-index: 100; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .video-card { border: 1px solid #222; cursor: pointer; transition: 0.3s; background: #0a0a0a; position: relative; }
+        .video-card:hover { border-color: #555; background: #111; }
+        .card-visual { height: 160px; display: flex; align-items: center; justify-content: center; background: #111; border-bottom: 1px solid #222; text-align: center; padding: 20px; }
+        .card-visual span { color: #444; font-size: 0.8rem; text-transform: uppercase; }
+        .video-info { padding: 15px; }
+        .video-info h3 { font-size: 0.9rem; margin: 0; color: #fff; }
+        .delete-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,0,0,0.2); border: 1px solid red; color: white; cursor: pointer; display: none; }
     </style>
 </head>
 <body>
@@ -124,130 +26,78 @@
     <div class="header">
         <div>
             <h1>PROJECT VESTA // MERCHIVE</h1>
-            <p style="color: #444; font-size: 0.7rem;">STATUS: <span id="sys-status" style="color: #0f0;">ONLINE</span></p>
+            <p style="color: #444; font-size: 0.7rem;">STATUS: <span style="color: #0f0;">ONLINE</span></p>
         </div>
         <div class="nav-links">
             <a href="/admin">+ ADD_VIDEO</a>
-            <a href="#" onclick="logout()">[ LOGOUT ]</a>
+            <a onclick="logout()">[ LOGOUT ]</a>
         </div>
     </div>
 
     <div id="player-container">
-        <button class="close-player-btn" onclick="closePlayer()">×</button>
-        <video id="main-player" controls preload="auto">
-            <source id="video-source" src="" type="video/mp4">
-        </video>
+        <button class="close-btn" onclick="closePlayer()">×</button>
+        <video id="main-player" controls></video>
     </div>
 
-    <div class="grid" id="video-grid">
-        <p>INITIALIZING_ARCHIVE_DATA...</p>
-    </div>
+    <div class="grid" id="video-grid"></div>
 
     <script>
         const token = localStorage.getItem('access_token');
-
+        
         function logout() {
             localStorage.removeItem('access_token');
             window.location.href = '/login';
         }
 
         function closePlayer() {
-            const container = document.getElementById('player-container');
             const player = document.getElementById('main-player');
             player.pause();
-            player.src = ""; // Stop the download stream
-            player.load();
-            container.style.display = 'none';
+            player.src = "";
+            document.getElementById('player-container').style.display = 'none';
         }
 
         async function deleteVideo(id, event) {
             event.stopPropagation();
-            if (!confirm("CONFIRM_DELETION: Proceed?")) return;
-
-            try {
-                const res = await fetch(`/api/videos/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    location.reload();
-                } else {
-                    alert("DELETE_FAILED");
-                }
-            } catch (err) {
-                console.error(err);
-            }
+            if (!confirm("DELETE VIDEO?")) return;
+            const res = await fetch(`/api/videos/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) location.reload();
         }
 
         async function loadArchive() {
-            const grid = document.getElementById('video-grid');
+            const res = await fetch('/api/videos/list');
+            const result = await res.json();
+            const container = document.getElementById('video-grid');
+            container.innerHTML = '';
 
-            if (!token) {
-                grid.innerHTML = '<div class="error-msg">ACCESS_DENIED. <a href="/login" style="color:#fff">LOGIN_REQUIRED</a></div>';
-                return;
-            }
+            result.data.forEach(video => {
+                const msgId = video.tg_file_ids[0];
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                card.innerHTML = `
+                    <button class="delete-btn" onclick="deleteVideo('${video.id}', event)">DEL</button>
+                    <div class="card-visual"><span>${video.title}</span></div>
+                    <div class="video-info">
+                        <h3>${video.title}</h3>
+                        <p style="color:#555; font-size:0.6rem;">${video.category.toUpperCase()}</p>
+                    </div>
+                `;
+                
+                // Show delete buttons if logged in
+                if(token) card.querySelector('.delete-btn').style.display = 'block';
 
-            try {
-                const response = await fetch('/api/videos/list', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const result = await response.json();
-
-                if (result.status === 'success' && result.data.length > 0) {
-                    grid.innerHTML = '';
-                    
-                    result.data.forEach(video => {
-                        const card = document.createElement('div');
-                        card.className = 'video-card';
-                        const msgId = (video.tg_file_ids && video.tg_file_ids.length > 0) ? video.tg_file_ids[0] : null;
-
-                        card.innerHTML = `
-                            <button class="delete-btn" onclick="deleteVideo('${video.id}', event)">×</button>
-                            <div style="position: relative; height: 160px; background: #080808;">
-                                <img src="/api/video/thumbnail/${msgId}" 
-                                    class="card-thumb" 
-                                    onerror="this.style.display='none'">
-                                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #222; font-size: 0.5rem; letter-spacing: 2px;">
-                                    NO_SIGNAL
-                                </div>
-                            </div>
-                            <div style="padding: 15px;">
-                                <span class="badge">${video.category || 'RAW_DATA'}</span>
-                                <h3>${video.title || 'UNTITLED_LOG'}</h3>
-                            </div>
-                        `;
-                                                
-                        card.onclick = () => {
-                            if (!msgId) return alert("NO_ID_FOUND");
-                            const container = document.getElementById('player-container');
-                            const player = document.getElementById('main-player');
-                            
-                            container.style.display = 'block';
-                            
-                            player.pause();
-                            player.removeAttribute('src'); 
-                            player.load();
-
-                            player.src = `/api/video/stream/${msgId}`;
-                            player.type = 'video/mp4';
-                            
-                            player.play().catch(e => {
-                                console.error("Playback failed:", e);
-                            });
-
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                        };
-                        
-                        grid.appendChild(card);
-                    });
-                } else {
-                    grid.innerHTML = '<p>ARCHIVE_EMPTY. Visit /admin to add content.</p>';
-                }
-            } catch (err) {
-                grid.innerHTML = `<p class="error-msg">SYSTEM_FAILURE: ${err.message}</p>`;
-            }
+                card.onclick = () => {
+                    const player = document.getElementById('main-player');
+                    document.getElementById('player-container').style.display = 'block';
+                    player.src = `/api/video/stream/${msgId}`;
+                    player.play();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+                container.appendChild(card);
+            });
         }
-
         loadArchive();
     </script>
 </body>
