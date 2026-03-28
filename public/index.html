@@ -94,24 +94,34 @@
                     const player = document.getElementById('main-player');
                     const container = document.getElementById('player-container');
                     
+                    // 1. Show the container first
                     container.style.display = 'block';
                     
-                    // 1. Reset player state
+                    // 2. Clear previous state to prevent "Source Not Supported" conflict
                     player.pause();
-                    player.removeAttribute('src');
-                    player.load(); 
-
-                    // 2. Assign new stream URL
+                    player.src = ""; 
+                    player.load();
+                
+                    // 3. Set the new stream URL
                     player.src = `/api/video/stream/${msgId}`;
-                    
-                    // 3. Robust Playback Trigger
-                    player.load(); 
-                    player.play().catch(e => {
-                        console.log("Autoplay prevented, trying muted...");
-                        player.muted = true;
-                        player.play();
-                    });
-
+                
+                    // 4. WAIT for the browser to acknowledge the stream exists
+                    player.oncanplay = () => {
+                        player.play().catch(e => {
+                            console.log("Autoplay blocked, trying muted...");
+                            player.muted = true;
+                            player.play();
+                        });
+                        // Remove listener so it doesn't trigger multiple times
+                        player.oncanplay = null;
+                    };
+                
+                    // 5. Handle stream errors immediately
+                    player.onerror = () => {
+                        console.error("Stream Error Code:", player.error.code);
+                        alert("STREAM_CONNECTION_TIMEOUT: Please try again in a moment.");
+                    };
+                
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
                 container.appendChild(card);
