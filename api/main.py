@@ -75,22 +75,22 @@ async def list_videos():
 
 @app.get("/api/video/stream/{message_id}")
 async def video_stream(message_id: str):
-    try:
-        async def file_generator():
-            async for chunk in stream_telegram_file(message_id):
-                if chunk:
-                    yield chunk
+    async def file_generator():
+        async for chunk in stream_telegram_file(message_id):
+            if chunk:
+                yield chunk
 
-        # Adding a specific media type and ensuring the header is lowercase
-        return StreamingResponse(
-            file_generator(),
-            media_type="video/mp4",
-            headers={
-                "accept-ranges": "bytes",
-                "content-type": "video/mp4",
-                "cache-control": "no-cache"
-            }
-        )
+    # Vercel requires lowercase header keys for some proxy layers
+    return StreamingResponse(
+        file_generator(),
+        media_type="video/mp4",
+        headers={
+            "accept-ranges": "bytes",
+            "content-type": "video/mp4",
+            "cache-control": "no-cache",
+            "connection": "keep-alive"
+        }
+    )
     except Exception as e:
         logger.error(f"STREAM_INIT_ERROR: {e}")
         raise HTTPException(status_code=500, detail="Stream initialization failed")
