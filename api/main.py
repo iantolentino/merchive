@@ -75,22 +75,29 @@ async def list_videos():
 
 @app.get("/api/video/stream/{message_id}")
 async def video_stream(message_id: str):
-    async def file_generator():
-        async for chunk in stream_telegram_file(message_id):
-            if chunk:
-                yield chunk
+    try:
+        # ENSURE CONNECTION: Vercel functions are ephemeral.
+        # We check connection right before streaming.
+        if not client.is_connected():
+            await client.start(bot_token=BOT_TOKEN)
 
-    # Vercel requires lowercase header keys for some proxy layers
-    return StreamingResponse(
-        file_generator(),
-        media_type="video/mp4",
-        headers={
-            "accept-ranges": "bytes",
-            "content-type": "video/mp4",
-            "cache-control": "no-cache",
-            "connection": "keep-alive"
-        }
-    )
+        async def file_generator():
+            # Send a tiny empty byte to keep the connection alive while searching Telegram
+            yield b"" 
+            async for chunk in stream_telegram_file(message_id):
+                if chunk:
+                    yield chunk
+
+        return StreamingResponse(
+            file_generator(),
+            media_type="video/mp4",
+            headers={
+                "accept-ranges": "bytes",
+                "content-type": "video/mp4",
+                "cache-control": "no-cache",
+                "connection": "keep-alive"
+            }
+        )
     except Exception as e:
         logger.error(f"STREAM_INIT_ERROR: {e}")
         raise HTTPException(status_code=500, detail="Stream initialization failed")
@@ -108,5 +115,6 @@ async def get_login_page():
 async def get_admin_page():
     return FileResponse(os.path.join(PUBLIC_PATH, "admin.html"))
 
+# Mounting static files last
 if os.path.exists(PUBLIC_PATH):
     app.mount("/static", StaticFiles(directory=PUBLIC_PATH), name="static")
