@@ -57,15 +57,20 @@ async def ensure_connected():
 async def stream_telegram_file(message_id: str):
     try:
         tg = await ensure_connected()
-        # ... your message fetching logic ...
+        target = int(CHANNEL_ID) if str(CHANNEL_ID).startswith('-100') else CHANNEL_ID
+        message = await tg.get_messages(target, ids=int(message_id))
+        
+        if not message or not message.media:
+            return
 
-        # Use 256KB chunks - small enough to be fast, large enough to fill buffer
-        async for chunk in tg.iter_download(message.media, request_size=256 * 1024):
+        # VERCEL OPTIMIZATION:
+        # Use a smaller request_size (128KB) so chunks arrive at Vercel 
+        # faster, preventing the 10-second "idle" timeout.
+        async for chunk in tg.iter_download(
+            message.media, 
+            request_size=128 * 1024  # 128KB chunks
+        ):
             if chunk:
                 yield chunk
-            else:
-                # CRITICAL: If Telegram is slow, send a "null" byte 
-                # to tell Vercel "I am still working!"
-                yield b'\x00' 
     except Exception as e:
         logger.error(f"Stream Error: {e}")
