@@ -15,11 +15,11 @@
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
         .video-card { border: 1px solid #222; cursor: pointer; transition: 0.3s; background: #0a0a0a; position: relative; }
         .video-card:hover { border-color: #555; background: #111; }
-        .card-visual { height: 160px; display: flex; align-items: center; justify-content: center; background: #111; border-bottom: 1px solid #222; text-align: center; padding: 20px; }
+        .card-visual { height: 160px; display: flex; align-items: center; justify-content: center; background: #111; border-bottom: 1px solid #222; text-align: center; padding: 20px; overflow: hidden; }
         .card-visual span { color: #444; font-size: 0.8rem; text-transform: uppercase; }
         .video-info { padding: 15px; }
         .video-info h3 { font-size: 0.9rem; margin: 0; color: #fff; }
-        .delete-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,0,0,0.2); border: 1px solid red; color: white; cursor: pointer; display: none; }
+        .delete-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,0,0,0.8); border: 1px solid red; color: white; cursor: pointer; display: none; z-index: 10; padding: 2px 5px; font-size: 10px; }
     </style>
 </head>
 <body>
@@ -54,18 +54,26 @@
         const player = document.getElementById('main-player');
         player.pause();
         player.src = "";
-        player.load(); // Forces the browser to dump the previous stream buffer
+        player.load(); 
         document.getElementById('player-container').style.display = 'none';
     }
 
     async function deleteVideo(id, event) {
         event.stopPropagation();
         if (!confirm("DELETE VIDEO?")) return;
-        const res = await fetch(`/api/videos/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) location.reload();
+        try {
+            const res = await fetch(`/api/videos/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                location.reload();
+            } else {
+                alert("Failed to delete video.");
+            }
+        } catch (err) {
+            console.error("Delete error:", err);
+        }
     }
 
     async function loadArchive() {
@@ -73,10 +81,18 @@
             const res = await fetch('/api/videos/list');
             const result = await res.json();
             const container = document.getElementById('video-grid');
+            
+            if (!result.data || result.data.length === 0) {
+                container.innerHTML = '<p style="color:#444;">NO VIDEOS FOUND IN ARCHIVE.</p>';
+                return;
+            }
+
             container.innerHTML = '';
 
             result.data.forEach(video => {
-                const msgId = video.tg_file_ids[0];
+                // Safely handle missing file IDs
+                const msgId = (video.tg_file_ids && video.tg_file_ids.length > 0) ? video.tg_file_ids[0] : null;
+                
                 const card = document.createElement('div');
                 card.className = 'video-card';
                 card.innerHTML = `
@@ -84,23 +100,32 @@
                     <div class="card-visual"><span>${video.title}</span></div>
                     <div class="video-info">
                         <h3>${video.title}</h3>
-                        <p style="color:#555; font-size:0.6rem;">${video.category.toUpperCase()}</p>
+                        <p style="color:#555; font-size:0.6rem;">${(video.category || 'Uncategorized').toUpperCase()}</p>
                     </div>
                 `;
                 
-                if(token) card.querySelector('.delete-btn').style.display = 'block';
+                // Show delete button only if logged in
+                if(token) {
+                    const delBtn = card.querySelector('.delete-btn');
+                    if(delBtn) delBtn.style.display = 'block';
+                }
 
                 card.onclick = () => {
+                    if (!msgId) {
+                        alert("Error: No Telegram message ID associated with this video.");
+                        return;
+                    }
+
                     const player = document.getElementById('main-player');
-                    const container = document.getElementById('player-container');
+                    const playerContainer = document.getElementById('player-container');
                     
-                    container.style.display = 'block';
+                    playerContainer.style.display = 'block';
                     player.pause();
-                    player.src = ""; // Clear old buffer
+                    player.src = ""; 
                     player.load();
                 
-                    const streamUrl = `/api/video/stream/${msgId}`;
-                    player.src = streamUrl;
+                    // Point to the streaming endpoint
+                    player.src = `/api/video/stream/${msgId}`;
                 
                     player.oncanplay = () => {
                         player.play().catch(() => {
@@ -110,24 +135,22 @@
                     };
                 
                     player.onerror = () => {
-                        // Error 4 is usually a server-side timeout or 404
-                        console.error("Vesta_Stream_Error:", player.error.code);
-                        if(player.error.code === 4) {
-                            console.warn("Check Vercel Logs: The server likely timed out connecting to Telegram.");
-                        }
+                        console.error("Vesta_Stream_Error Code:", player.error.code);
+                        alert("Failed to load stream. Check Vercel logs for Telegram connection status.");
                     };
                 
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
                 
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                };
                 container.appendChild(card);
             });
         } catch (err) {
             console.error("Failed to load archive:", err);
+            document.getElementById('video-grid').innerHTML = '<p style="color:red;">SERVER ERROR: FAILED TO FETCH VIDEO LIST.</p>';
         }
     }
+
+    // Initialize
     loadArchive();
 </script>
 </body>
