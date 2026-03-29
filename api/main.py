@@ -8,10 +8,11 @@ from typing import List
 from loguru import logger
 
 # Internal Imports
-from api.database import supabase
-from api.models import LoginRequest, TokenResponse
-from api.auth import ADMIN_SECRET, create_access_token, verify_admin
-from api.telegram_logic import stream_telegram_file, client, BOT_TOKEN, ensure_connected
+
+from database import supabase
+from models import LoginRequest, TokenResponse
+from auth import ADMIN_SECRET, create_access_token, verify_admin
+from telegram_logic import stream_telegram_file, client, BOT_TOKEN, ensure_connected
 
 # --- Setup Paths ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
