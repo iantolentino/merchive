@@ -1,42 +1,38 @@
 import os
-from fastapi import FastAPI, HTTPException, Depends, Request
+import sys
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional
 from loguru import logger
 
-# --- INTERNAL IMPORTS ---
+# --- PATH & IMPORT FIXES ---
+# This line fixes the 'ModuleNotFoundError' on Railway
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 try:
-    from api.database import supabase
-    from api.models import LoginRequest, TokenResponse
-    from api.auth import ADMIN_SECRET, create_access_token, verify_admin
-    from api.telegram_logic import stream_telegram_file, client, ensure_connected, CHANNEL_ID
-except ImportError:
     from database import supabase
     from models import LoginRequest, TokenResponse
     from auth import ADMIN_SECRET, create_access_token, verify_admin
     from telegram_logic import stream_telegram_file, client, ensure_connected, CHANNEL_ID
+except ImportError:
+    # Fallback for different directory structures
+    from api.database import supabase
+    from api.models import LoginRequest, TokenResponse
+    from api.auth import ADMIN_SECRET, create_access_token, verify_admin
+    from api.telegram_logic import stream_telegram_file, client, ensure_connected, CHANNEL_ID
 
-# --- SETUP ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PUBLIC_PATH = os.path.join(BASE_DIR, "public")
 
-class VideoCreate(BaseModel):
-    title: str
-    category: str
-    tg_file_ids: List[str]
-    subtitle_url: Optional[str] = None
-    is_private: bool = False
-
-app = FastAPI(title="Project Vesta // MC")
+app = FastAPI(title="Project Vesta // Railway")
 
 @app.on_event("startup")
 async def startup_event():
     await ensure_connected()
     logger.info("✅ VESTA CORE: ONLINE")
 
-# --- STREAMING LOGIC ---
 @app.get("/api/video/stream/{message_id}")
 async def video_stream(message_id: str, request: Request):
     try:
@@ -51,13 +47,14 @@ async def video_stream(message_id: str, request: Request):
         file_size = message.media.document.size
         range_header = request.headers.get("range")
 
+        # Byte-Range Logic for smooth seeking and long videos
         if range_header:
             range_str = range_header.replace("bytes=", "")
             parts = range_str.split("-")
             start = int(parts[0])
             
-            # 1MB Chunk size for Railway stability
-            chunk_size = 1024 * 1024 
+            # Requesting ~1.5MB chunks keeps the connection alive
+            chunk_size = 1536 * 1024 
             end = int(parts[1]) if (len(parts) > 1 and parts[1]) else min(start + chunk_size, file_size - 1)
             content_length = (end - start) + 1
             
@@ -69,11 +66,10 @@ async def video_stream(message_id: str, request: Request):
                     "Accept-Ranges": "bytes",
                     "Content-Length": str(content_length),
                     "Content-Type": "video/mp4",
-                    "Cache-Control": "no-cache",
                 }
             )
 
-        # Fallback for full download
+        # Full stream fallback
         return StreamingResponse(
             stream_telegram_file(m_id),
             media_type="video/mp4",
@@ -85,19 +81,12 @@ async def video_stream(message_id: str, request: Request):
         )
     except Exception as e:
         logger.error(f"Stream Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal Streaming Error")
 
 @app.get("/api/videos/list")
 async def list_videos():
     response = supabase.table("videos").select("*").execute()
     return {"status": "success", "data": response.data}
-
-@app.post("/api/auth/login", response_model=TokenResponse)
-async def login(req: LoginRequest):
-    if req.password != ADMIN_SECRET:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_access_token(data={"role": "admin"})
-    return {"access_token": token, "token_type": "bearer"}
 
 @app.get("/")
 async def read_index():
