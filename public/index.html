@@ -21,6 +21,29 @@
         .video-info { padding: 15px; }
         .video-info h3 { font-size: 0.9rem; margin: 0; color: #fff; }
         .delete-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,0,0,0.8); border: 1px solid red; color: white; cursor: pointer; display: none; z-index: 10; padding: 2px 5px; font-size: 10px; }
+        /* Add this to your <style> block */
+        #loading-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            color: #0f0;
+            font-size: 0.8rem;
+        }
+        .spinner {
+            border: 2px solid #222;
+            border-top: 2px solid #0f0;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -38,8 +61,11 @@
 
     <div id="player-container">
         <button class="close-btn" onclick="closePlayer()">×</button>
-        <video id="main-player" controls crossorigin="anonymous">
-            </video>
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <span>STABILIZING VESTA STREAM...</span>
+        </div>
+        <video id="main-player" controls crossorigin="anonymous"></video>
     </div>
 
     <div class="grid" id="video-grid"></div>
@@ -128,18 +154,19 @@
                 card.onclick = () => {
                     const player = document.getElementById('main-player');
                     const playerCont = document.getElementById('player-container');
+                    const loader = document.getElementById('loading-overlay');
                     
                     playerCont.style.display = 'block';
-                    player.pause();
-                    player.innerHTML = ''; // Reset for new video
+                    loader.style.display = 'flex'; // Show loader
                     
-                    // 1. Inject Video Source
+                    player.pause();
+                    player.innerHTML = ''; 
+                    
                     const source = document.createElement('source');
                     source.src = `/api/video/stream/${msgId}`;
                     source.type = 'video/mp4';
                     player.appendChild(source);
 
-                    // 2. Inject Subtitles if they exist
                     if (video.subtitle_url) {
                         const track = document.createElement('track');
                         track.kind = 'subtitles';
@@ -151,13 +178,21 @@
                     }
 
                     player.load();
-                    player.play().catch(e => {
-                        console.log("Autoplay prevented, user must click play.");
-                    });
-                    
+
+                    // Hide loader only when enough data is buffered to start playing
+                    player.oncanplay = () => {
+                        loader.style.display = 'none';
+                        player.play();
+                    };
+
+                    // If it stalls during the movie, show a small hint
+                    player.onwaiting = () => {
+                        loader.style.display = 'flex';
+                        loader.querySelector('span').innerText = "RE-BUFFERING...";
+                    };
+
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
-                
                 container.appendChild(card);
             });
         } catch (err) {
