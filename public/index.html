@@ -160,36 +160,29 @@
                     loader.style.display = 'flex';
                     
                     player.pause();
-                    player.innerHTML = ''; 
-
-                    // Adding a timestamp ?t= makes the browser treat every click as a "Fresh Start"
-                    player.src = `/api/video/stream/${msgId}?t=${Date.now()}`;
-
-                    // ADD SUBTITLES
-                    if (video.subtitle_url) {
-                        const track = document.createElement('track');
-                        track.kind = 'subtitles';
-                        track.src = video.subtitle_url;
-                        track.srclang = 'en';
-                        track.default = true;
-                        player.appendChild(track);
-                    }
-
+                    // Clean URL is better for Range requests
+                    player.src = `/api/video/stream/${msgId}`;
+                    
                     player.load();
 
-                    // SPEED FIX: Don't wait 5 minutes. 
-                    // This event fires as soon as the browser has enough to start.
+                    // Start playing as soon as the first chunk arrives
                     player.oncanplay = () => {
                         loader.style.display = 'none';
-                        player.play().catch(e => console.log("Manual play required"));
+                        player.play().catch(() => {
+                            player.muted = true; // Auto-play fix
+                            player.play();
+                        });
                     };
 
-                    // If it stops at 4 mins, show the loader so you know it's re-connecting
+                    // If the user skips forward or Vercel lags, show the loader immediately
                     player.onwaiting = () => {
                         loader.style.display = 'flex';
-                        loader.querySelector('span').innerText = "BUFFERING NEXT SEGMENT...";
+                        loader.querySelector('span').innerText = "FETCHING DATA...";
                     };
+
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
+
                 container.appendChild(card);
             });
         } catch (err) {

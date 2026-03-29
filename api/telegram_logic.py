@@ -54,7 +54,7 @@ async def ensure_connected():
         await client.connect()
     return client
 
-async def stream_telegram_file(message_id: str):
+async def stream_telegram_file(message_id: str, offset: int = 0, limit: int = None):
     try:
         tg = await ensure_connected()
         target = int(CHANNEL_ID) if str(CHANNEL_ID).startswith('-100') else CHANNEL_ID
@@ -63,11 +63,13 @@ async def stream_telegram_file(message_id: str):
         if not message or not message.media:
             return
 
-        # 256KB is the "Safe Zone" for Vercel Free Tier
+        # Using iter_download with offset and limit allows the "Seeking" behavior
         async for chunk in tg.iter_download(
-            message.media, 
-            request_size=256 * 1024, 
-            buffer_size=1 * 1024 * 1024 # Pre-fetches 1MB to stay ahead
+            message.media,
+            offset=offset,
+            limit=limit,
+            request_size=256 * 1024, # 256KB chunks
+            buffer_size=1 * 1024 * 1024 # 1MB pre-fetch
         ):
             if chunk:
                 yield chunk
