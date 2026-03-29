@@ -17,13 +17,32 @@ CHANNEL_ID = os.getenv("CHANNEL_ID")
 SESSION_STRING = os.getenv("TG_SESSION") # Added this!
 
 # --- SMART CLIENT LOGIC ---
-# If TG_SESSION exists (Vercel), use it. Otherwise, use local 'anon' session.
 if SESSION_STRING:
-    logger.info("Using StringSession for Vercel/Production")
+    logger.info("✅ Vercel Mode: Using StringSession")
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 else:
-    logger.info("Using local 'anon.session' file for testing")
+    logger.info("🏠 Local Mode: Using anon.session")
     client = TelegramClient('anon', API_ID, API_HASH)
+
+async def ensure_connected():
+    if not client.is_connected():
+        await client.connect()
+    return client
+
+async def stream_telegram_file(message_id: str):
+    try:
+        tg = await ensure_connected()
+        target = int(CHANNEL_ID) if str(CHANNEL_ID).startswith('-100') else CHANNEL_ID
+        message = await tg.get_messages(target, ids=int(message_id))
+        
+        if not message or not message.media:
+            return
+
+        async for chunk in tg.iter_download(message.media, request_size=256 * 1024):
+            if chunk:
+                yield chunk
+    except Exception as e:
+        logger.error(f"Stream Error: {e}")
 
 async def ensure_connected():
     """Ensure the client is connected before any operation."""

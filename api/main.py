@@ -11,8 +11,7 @@ from loguru import logger
 from api.database import supabase
 from api.models import LoginRequest, TokenResponse
 from api.auth import ADMIN_SECRET, create_access_token, verify_admin
-from api.telegram_logic import stream_telegram_file, client, BOT_TOKEN
-from api.telegram_logic import stream_telegram_file, client, ensure_connected
+from api.telegram_logic import stream_telegram_file, client, BOT_TOKEN, ensure_connected
 
 # --- Setup Paths ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
