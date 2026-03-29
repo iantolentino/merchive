@@ -1,0 +1,17 @@
+{
+  "name": "vesta-merchive-railway",
+  "version": "1.0.0",
+  "description": "Project Vesta Streaming Service",
+  "main": "api/main.py",
+  "scripts": {
+    "start": "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}",
+    "dev": "uvicorn api.main:app --reload"
+  },
+  "dependencies": {
+    "fastapi": "^0.100.0",
+    "uvicorn": "^0.22.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
