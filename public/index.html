@@ -155,7 +155,7 @@
                     if(delBtn) delBtn.style.display = 'block';
                 }
 
-                card.onclick = async () => {
+                card.onclick = () => {
                     const player = document.getElementById('main-player');
                     const playerCont = document.getElementById('player-container');
                     const loadState = document.getElementById('load-state');
@@ -164,69 +164,58 @@
                     
                     playerCont.style.display = 'block';
                     player.pause();
+                    player.innerHTML = ''; // Clear old tracks
                     
-                    // 1. Initialize MediaSource
-                    const ms = new MediaSource();
-                    player.src = URL.createObjectURL(ms);
+                    // 1. Direct Stream URL
+                    // Letting the browser handle the fetch is safer for large files
+                    const streamUrl = `/api/video/stream/${msgId}`;
+                    player.src = streamUrl;
                     
-                    loadState.innerText = "OPENING STREAM...";
+                    loadState.innerText = "CONNECTING TO VESTA...";
                     loadState.style.color = "orange";
                     progressFill.style.width = "0%";
 
-                    ms.addEventListener('sourceopen', async () => {
-                        const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
-                        
-                        try {
-                            const response = await fetch(`/api/video/stream/${msgId}`);
-                            const reader = response.body.getReader();
-                            
-                            let receivedLength = 0;
-                            const PREBUFFER_TARGET = 15 * 1024 * 1024; // 15MB to start
-                            let isStarted = false;
-
-                            while (true) {
-                                const {done, value} = await reader.read();
-                                if (done) {
-                                    if (ms.readyState === 'open') ms.endOfStream();
-                                    break;
-                                }
-
-                                // Append chunk to video buffer
-                                await new Promise(r => {
-                                    sb.appendBuffer(value);
-                                    sb.onupdateend = r;
-                                });
-
-                                receivedLength += value.length;
-
-                                // Update Progress UI
-                                const percent = Math.min((receivedLength / PREBUFFER_TARGET) * 100, 100);
+                    // 2. Track the Browser's Native Buffering Progress
+                    player.onprogress = () => {
+                        if (player.buffered.length > 0) {
+                            const bufferedEnd = player.buffered.end(player.buffered.length - 1);
+                            const duration = player.duration;
+                            if (duration > 0) {
+                                const percent = (bufferedEnd / duration) * 100;
                                 progressFill.style.width = percent + "%";
-                                loadPercent.innerText = `${Math.round(percent)}% PRE-LOADED`;
-
-                                // Start playback once we have enough data
-                                if (receivedLength >= PREBUFFER_TARGET && !isStarted) {
-                                    isStarted = true;
-                                    loadState.innerText = "STABLE // PLAYING";
-                                    loadState.style.color = "#0f0";
-                                    player.play().catch(() => {
-                                        console.log("Waiting for user interaction to play...");
-                                    });
-                                }
+                                loadPercent.innerText = `${Math.round(percent)}% CACHED`;
                             }
-                        } catch (err) {
-                            console.error("Stream Error:", err);
-                            loadState.innerText = "STREAM INTERRUPTED";
-                            loadState.style.color = "red";
                         }
-                    });
+                    };
 
-                    // Subtitles (keep these separate)
+                    player.oncanplay = () => {
+                        loadState.innerText = "STABLE // STREAMING";
+                        loadState.style.color = "#0f0";
+                        player.play().catch(() => {
+                            // Browsers often block autoplay with sound
+                            player.muted = true; 
+                            player.play();
+                        });
+                    };
+
+                    player.onwaiting = () => {
+                        loadState.innerText = "RE-BUFFERING...";
+                        loadState.style.color = "yellow";
+                    };
+
+                    player.onerror = () => {
+                        console.error("Vesta_Stream_Error:", player.error.code);
+                        loadState.innerText = "STREAM INTERRUPTED";
+                        loadState.style.color = "red";
+                    };
+
+                    // 3. Subtitles track injection
                     if (video.subtitle_url) {
                         const track = document.createElement('track');
                         track.kind = 'subtitles';
                         track.src = video.subtitle_url;
                         track.srclang = 'en';
+                        track.label = "English";
                         track.default = true;
                         player.appendChild(track);
                     }
