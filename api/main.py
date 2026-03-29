@@ -3,29 +3,18 @@ import sys
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from typing import List, Optional
 from loguru import logger
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 try:
     from database import supabase
-    from models import LoginRequest, TokenResponse
-    from auth import ADMIN_SECRET, create_access_token, verify_admin
     from telegram_logic import stream_telegram_file, client, ensure_connected, CHANNEL_ID
 except ImportError:
     from api.database import supabase
-    from api.models import LoginRequest, TokenResponse
-    from api.auth import ADMIN_SECRET, create_access_token, verify_admin
     from api.telegram_logic import stream_telegram_file, client, ensure_connected, CHANNEL_ID
 
-app = FastAPI(title="Project Vesta // Final Mobile Optimized")
-
-@app.on_event("startup")
-async def startup_event():
-    await ensure_connected()
-    logger.info("🚀 VESTA CORE: ONLINE")
+app = FastAPI(title="Merchive Engine")
 
 @app.get("/api/video/stream/{message_id}")
 async def video_stream(message_id: str, request: Request):
@@ -41,35 +30,37 @@ async def video_stream(message_id: str, request: Request):
         file_size = message.media.document.size
         range_header = request.headers.get("range")
 
-        # Start point logic
+        # DEFAULT START (For Mobile Probes)
         start = 0
         if range_header:
             range_str = range_header.replace("bytes=", "")
             start = int(range_str.split("-")[0])
         
-        # AGGRESSIVE BUFFER: Force 3MB per request to fill mobile buffers faster
-        chunk_size = 3 * 1024 * 1024 
+        # 2MB chunks are safer for mobile data stability
+        chunk_size = 2 * 1024 * 1024 
         end = min(start + chunk_size, file_size - 1)
         content_length = (end - start) + 1
         
+        # CRITICAL HEADERS FOR MOBILE SAFARI
+        headers = {
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(content_length),
+            "Content-Type": "video/mp4",
+        }
+
         return StreamingResponse(
             stream_telegram_file(m_id, offset=start, limit=content_length),
             status_code=206,
-            headers={
-                "Content-Range": f"bytes {start}-{end}/{file_size}",
-                "Accept-Ranges": "bytes",
-                "Content-Length": str(content_length),
-                "Content-Type": "video/mp4",
-                "Access-Control-Allow-Origin": "*",
-            }
+            headers=headers
         )
     except Exception as e:
-        logger.error(f"Stream Error: {e}")
+        logger.error(f"Mobile Stream Fail: {e}")
         return HTTPException(status_code=500)
 
 @app.get("/api/videos/list")
 async def list_videos():
-    response = supabase.table("videos").select("*").execute()
+    response = supabase.table("videos").select("*").order("created_at", desc=True).execute()
     return {"status": "success", "data": response.data}
 
 @app.get("/")

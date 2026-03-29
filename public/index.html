@@ -2,89 +2,92 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VESTA // MERCHIVE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MERCHIVE // VESTA</title>
     <style>
-        body { background: #050505; color: #eee; font-family: 'Courier New', monospace; padding: 20px; margin: 0; }
-        #player-container { position: relative; margin-bottom: 30px; display: none; background: #000; border: 1px solid #333; }
-        video { width: 100%; display: block; max-height: 80vh; background: #000; outline: none; }
-        .progress-bar { width: 100%; height: 6px; background: #111; position: relative; }
-        .buffer-fill { position: absolute; height: 100%; background: #444; width: 0%; z-index: 1; transition: width 0.3s; }
-        .play-fill { position: absolute; height: 100%; background: #0f0; width: 0%; z-index: 2; }
-        #loader { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; 
-                  background: rgba(0,0,0,0.9); padding: 15px; border: 1px solid #0f0; color: #0f0; font-size: 0.8rem; text-align: center; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
-        .card { border: 1px solid #222; padding: 15px; cursor: pointer; background: #0a0a0a; transition: 0.2s; }
-        .card:hover { border-color: #0f0; }
-        .close-btn { position: absolute; top: 10px; right: 10px; z-index: 11; background: #fff; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; }
+        :root { --accent: #00ff88; --bg: #0a0a0a; --card: #141414; }
+        body { background: var(--bg); color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; -webkit-tap-highlight-color: transparent; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; padding-bottom: 15px; margin-bottom: 25px; }
+        .logo { font-weight: 800; letter-spacing: 3px; font-size: 1.2rem; color: var(--accent); }
+        .badge { font-size: 0.6rem; background: #222; padding: 4px 8px; border-radius: 4px; vertical-align: middle; }
+
+        #player-wrapper { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; flex-direction: column; justify-content: center; }
+        video { width: 100%; max-height: 80vh; outline: none; }
+        
+        .close-btn { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.1); border: 1px solid #333; color: #fff; padding: 10px 15px; border-radius: 50px; cursor: pointer; z-index: 1001; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
+        .card { background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid #222; transition: 0.2s; cursor: pointer; position: relative; }
+        .card:active { transform: scale(0.96); }
+        .card-info { padding: 12px; }
+        .card-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .card-meta { font-size: 0.7rem; color: #666; text-transform: uppercase; }
+
+        #status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--accent); font-size: 0.8rem; letter-spacing: 1px; text-align: center; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <h2 style="letter-spacing: 2px;">PROJECT VESTA</h2>
+    <header>
+        <div class="logo">MERCHIVE <span class="badge">PROD</span></div>
+        <div style="font-size: 0.7rem; color: #444;">DATABASE: SUPABASE</div>
+    </header>
 
-    <div id="player-container">
-        <button class="close-btn" onclick="closePlayer()">CLOSE</button>
-        <div id="loader">PREPARING STREAM...<br><span id="load-percent">0%</span></div>
-        <video id="video-player" controls playsinline preload="auto" crossorigin="anonymous"></video>
-        <div class="progress-bar">
-            <div id="buffer-bar" class="buffer-fill"></div>
-            <div id="play-bar" class="play-fill"></div>
-        </div>
+    <div id="player-wrapper">
+        <button class="close-btn" onclick="stopVideo()">CLOSE</button>
+        <div id="status">INITIALIZING...</div>
+        <video id="player" controls playsinline preload="auto" crossorigin="anonymous"></video>
     </div>
 
     <div id="grid" class="grid"></div>
 
     <script>
-        const v = document.getElementById('video-player');
-        const bBar = document.getElementById('buffer-bar');
-        const pBar = document.getElementById('play-bar');
-        const load = document.getElementById('loader');
-        const loadText = document.getElementById('load-percent');
+        const player = document.getElementById('player');
+        const wrapper = document.getElementById('player-wrapper');
+        const status = document.getElementById('status');
 
-        v.addEventListener('progress', () => {
-            if (v.buffered.length > 0) {
-                const bufferedEnd = v.buffered.end(v.buffered.length - 1);
-                const percent = (bufferedEnd / v.duration) * 100;
-                bBar.style.width = percent + "%";
-                loadText.innerText = Math.round(percent) + "% BUFFERED";
-                if (bufferedEnd > v.currentTime + 2 || percent > 95) {
-                    load.style.display = 'none';
-                }
-            }
-        });
+        player.onwaiting = () => status.innerText = "BUFFERING...";
+        player.onplaying = () => status.innerText = "";
+        player.onerror = () => status.innerText = "STREAM ERROR. RETRYING...";
 
-        v.onwaiting = () => load.style.display = 'block';
-        v.onplaying = () => load.style.display = 'none';
-        v.ontimeupdate = () => { pBar.style.width = (v.currentTime / v.duration * 100) + "%"; };
-
-        async function loadGrid() {
+        async function fetchVideos() {
             const res = await fetch('/api/videos/list');
-            const { data } = await res.json();
+            const json = await res.json();
             const grid = document.getElementById('grid');
-            data.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'card';
-                div.innerHTML = `<strong>${item.title}</strong><br><small>${item.category}</small>`;
-                div.onclick = () => {
-                    document.getElementById('player-container').style.display = 'block';
-                    load.style.display = 'block';
-                    v.src = `/api/video/stream/${item.tg_file_ids[0]}`;
-                    v.load();
-                    v.play();
-                    window.scrollTo(0,0);
-                };
-                grid.appendChild(div);
+            
+            json.data.forEach(v => {
+                const el = document.createElement('div');
+                el.className = 'card';
+                el.innerHTML = `
+                    <div style="height:100px; background:#1a1a1a; display:flex; align-items:center; justify-content:center; color:#333;">▶</div>
+                    <div class="card-info">
+                        <span class="card-title">${v.title}</span>
+                        <span class="card-meta">${v.category || 'General'}</span>
+                    </div>
+                `;
+                el.onclick = () => playVideo(v.tg_file_ids[0]);
+                grid.appendChild(el);
             });
         }
 
-        function closePlayer() {
-            v.pause();
-            v.src = "";
-            document.getElementById('player-container').style.display = 'none';
+        function playVideo(id) {
+            wrapper.style.display = 'flex';
+            status.innerText = "CONNECTING TO TG...";
+            player.src = `/api/video/stream/${id}`;
+            player.load();
+            player.play().catch(err => {
+                console.log("Autoplay blocked, showing play button");
+            });
         }
 
-        loadGrid();
+        function stopVideo() {
+            player.pause();
+            player.src = "";
+            wrapper.style.display = 'none';
+        }
+
+        fetchVideos();
     </script>
 </body>
 </html>
