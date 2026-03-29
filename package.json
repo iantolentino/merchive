@@ -9,7 +9,11 @@
   },
   "dependencies": {
     "fastapi": "^0.100.0",
-    "uvicorn": "^0.22.0"
+    "uvicorn": "^0.22.0",
+    "telethon": "^1.30.0",
+    "supabase": "^2.0.0",
+    "loguru": "^0.7.0",
+    "python-dotenv": "^1.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
