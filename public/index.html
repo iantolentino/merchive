@@ -7,7 +7,8 @@
     <style>
         body { background: #050505; color: #eee; font-family: 'Courier New', monospace; padding: 40px; margin: 0; }
         .header { border-bottom: 1px solid #222; margin-bottom: 30px; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
-        .nav-links a { color: #666; text-decoration: none; font-size: 0.8rem; margin-left: 20px; cursor: pointer; }
+        /* Hide nav links by default, JS will show them if token exists */
+        .nav-links a { color: #666; text-decoration: none; font-size: 0.8rem; margin-left: 20px; cursor: pointer; display: none; }
         .nav-links a:hover { color: #fff; }
         #player-container { position: relative; margin-bottom: 50px; display: none; border: 1px solid #333; background: #000; width: 100%; }
         video { width: 100%; display: block; max-height: 70vh; }
@@ -29,30 +30,46 @@
             <h1>PROJECT VESTA // MERCHIVE</h1>
             <p style="color: #444; font-size: 0.7rem;">STATUS: <span style="color: #0f0;">ONLINE</span></p>
         </div>
-        <div class="nav-links">
-            <a href="/admin">+ ADD_VIDEO</a>
-            <a onclick="logout()">[ LOGOUT ]</a>
+        <div class="nav-links" id="nav-links">
+            <a href="/admin" id="admin-link">+ ADD_VIDEO</a>
+            <a onclick="logout()" id="logout-link">[ LOGOUT ]</a>
         </div>
     </div>
 
     <div id="player-container">
         <button class="close-btn" onclick="closePlayer()">×</button>
-        <video id="main-player" controls></video>
+        <video id="main-player" controls crossorigin="anonymous">
+            </video>
     </div>
 
     <div class="grid" id="video-grid"></div>
 
 <script>
     const token = localStorage.getItem('access_token');
+
+    // UI Toggle Logic: Runs immediately to show/hide admin buttons
+    function updateUI() {
+        const adminLink = document.getElementById('admin-link');
+        const logoutLink = document.getElementById('logout-link');
+        
+        if (token) {
+            adminLink.style.display = 'inline';
+            logoutLink.style.display = 'inline';
+        } else {
+            adminLink.style.display = 'none';
+            logoutLink.style.display = 'none';
+        }
+    }
     
     function logout() {
         localStorage.removeItem('access_token');
-        window.location.href = '/login';
+        window.location.href = '/'; 
     }
 
     function closePlayer() {
         const player = document.getElementById('main-player');
         player.pause();
+        player.innerHTML = ""; // Clear sources and tracks
         player.src = "";
         player.load(); 
         document.getElementById('player-container').style.display = 'none';
@@ -90,7 +107,6 @@
             container.innerHTML = '';
 
             result.data.forEach(video => {
-                // Safely handle missing file IDs
                 const msgId = (video.tg_file_ids && video.tg_file_ids.length > 0) ? video.tg_file_ids[0] : null;
                 
                 const card = document.createElement('div');
@@ -104,7 +120,6 @@
                     </div>
                 `;
                 
-                // Show delete button only if logged in
                 if(token) {
                     const delBtn = card.querySelector('.delete-btn');
                     if(delBtn) delBtn.style.display = 'block';
@@ -112,19 +127,19 @@
 
                 card.onclick = () => {
                     const player = document.getElementById('main-player');
-                    const container = document.getElementById('player-container');
+                    const playerCont = document.getElementById('player-container');
                     
-                    container.style.display = 'block';
+                    playerCont.style.display = 'block';
                     player.pause();
-                    player.innerHTML = ''; // Clear previous tracks
+                    player.innerHTML = ''; // Reset for new video
                     
-                    // 1. Add the Video Source
+                    // 1. Inject Video Source
                     const source = document.createElement('source');
                     source.src = `/api/video/stream/${msgId}`;
                     source.type = 'video/mp4';
                     player.appendChild(source);
 
-                    // 2. Add Subtitles (if they exist in your DB)
+                    // 2. Inject Subtitles if they exist
                     if (video.subtitle_url) {
                         const track = document.createElement('track');
                         track.kind = 'subtitles';
@@ -136,7 +151,10 @@
                     }
 
                     player.load();
-                    player.play();
+                    player.play().catch(e => {
+                        console.log("Autoplay prevented, user must click play.");
+                    });
+                    
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
                 
@@ -148,7 +166,8 @@
         }
     }
 
-    // Initialize
+    // Execute on Load
+    updateUI();
     loadArchive();
 </script>
 </body>

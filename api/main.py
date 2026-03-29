@@ -31,7 +31,6 @@ class VideoCreate(BaseModel):
     category: str
     tg_file_ids: List[str]
     subtitle_url: str = None
-    is_private: bool = False
 
 app = FastAPI(title="Project Vesta // MC")
 

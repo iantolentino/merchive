@@ -55,31 +55,22 @@ async def ensure_connected():
     return client
 
 async def stream_telegram_file(message_id: str):
-    """Streams the raw video file from the Telegram channel."""
     try:
         tg = await ensure_connected()
-        
-        # Format Channel ID correctly
-        # If it's a string like '-100...', turn it into an int
         target = int(CHANNEL_ID) if str(CHANNEL_ID).startswith('-100') else CHANNEL_ID
-        
-        # 1. Get the message object
         message = await tg.get_messages(target, ids=int(message_id))
         
         if not message or not message.media:
-            logger.error(f"❌ MEDIA_NOT_FOUND: Message {message_id}")
             return
 
-        logger.info(f"🎥 STREAMING_START: Message {message_id}")
-        
-        # 2. Iterate through chunks
-        # 128KB - 256KB is better for Vercel to avoid timeouts compared to 1MB chunks
+        # VERCEL OPTIMIZATION:
+        # Use a smaller request_size (128KB) so chunks arrive at Vercel 
+        # faster, preventing the 10-second "idle" timeout.
         async for chunk in tg.iter_download(
             message.media, 
-            request_size=256 * 1024 
+            request_size=128 * 1024  # 128KB chunks
         ):
             if chunk:
                 yield chunk
-                
     except Exception as e:
-        logger.error(f"🚨 STREAM_ERROR: {e}")
+        logger.error(f"Stream Error: {e}")
