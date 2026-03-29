@@ -7,6 +7,8 @@ from pydantic import BaseModel
 from typing import List
 from loguru import logger
 
+CHANNEL_ID = os.getenv("CHANNEL_ID")
+
 # --- INTERNAL IMPORTS ---
 # Vercel needs the 'api.' prefix when running as a deployed function
 try:
@@ -88,47 +90,32 @@ async def list_videos():
 @app.get("/api/video/stream/{message_id}")
 async def video_stream(message_id: str, request: Request):
     try:
+        # Re-verify connection for the stream request
         await ensure_connected()
-        target = int(CHANNEL_ID) if str(CHANNEL_ID).startswith('-100') else CHANNEL_ID
-        message = await client.get_messages(target, ids=int(message_id))
-        
-        if not message or not message.media:
-            raise HTTPException(status_code=404, detail="Video not found")
 
-        file_size = message.media.document.size
-        range_header = request.headers.get("range")
-
-        # Handle Byte-Range Requests (This makes it smooth and seekable)
-        if range_header:
-            range_str = range_header.replace("bytes=", "")
-            parts = range_str.split("-")
-            start = int(parts[0])
-            # If browser doesn't specify end, we give it a 2MB chunk
-            chunk_size = 2 * 1024 * 1024 
-            end = int(parts[1]) if parts[1] else min(start + chunk_size, file_size - 1)
+        async def file_generator():
+            # 1. Heartbeat: Keeps Vercel connection alive during initial Telegram handshake
+            yield b"" 
             
-            content_length = (end - start) + 1
-            
-            return StreamingResponse(
-                stream_telegram_file(message_id, offset=start, limit=content_length),
-                status_code=206,
-                headers={
-                    "Content-Range": f"bytes {start}-{end}/{file_size}",
-                    "Accept-Ranges": "bytes",
-                    "Content-Length": str(content_length),
-                    "Content-Type": "video/mp4",
-                }
-            )
+            try:
+                async for chunk in stream_telegram_file(message_id):
+                    if chunk:
+                        yield chunk
+            except Exception as e:
+                logger.error(f"Stream Generator Error: {e}")
 
-        # Fallback for browsers that don't support range
         return StreamingResponse(
-            stream_telegram_file(message_id),
+            file_generator(),
             media_type="video/mp4",
-            headers={"Accept-Ranges": "bytes", "Content-Length": str(file_size)}
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Type": "video/mp4",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
         )
-
     except Exception as e:
-        logger.error(f"STREAM_INIT_ERROR: {e}")
+        logger.error(f"STREAM_INIT_ERROR for {message_id}: {e}")
         raise HTTPException(status_code=500, detail="Stream Connection Failed")
 
 # --- PAGE ROUTES ---
