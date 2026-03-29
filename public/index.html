@@ -158,71 +158,77 @@
                 card.onclick = async () => {
                     const player = document.getElementById('main-player');
                     const playerCont = document.getElementById('player-container');
-                    
-                    // Get the UI elements
                     const loadState = document.getElementById('load-state');
                     const loadPercent = document.getElementById('load-percentage');
                     const progressFill = document.getElementById('progress-bar-fill');
                     
                     playerCont.style.display = 'block';
                     player.pause();
-                    player.src = "";
                     
-                    loadState.innerText = "INITIALIZING STREAM...";
+                    // 1. Initialize MediaSource
+                    const ms = new MediaSource();
+                    player.src = URL.createObjectURL(ms);
+                    
+                    loadState.innerText = "OPENING STREAM...";
                     loadState.style.color = "orange";
                     progressFill.style.width = "0%";
 
-                    try {
-                        // Start the manual fetch
-                        const response = await fetch(`/api/video/stream/${msgId}`);
-                        const reader = response.body.getReader();
+                    ms.addEventListener('sourceopen', async () => {
+                        const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
                         
-                        let receivedLength = 0;
-                        let chunks = []; 
-                        const PREBUFFER_LIMIT = 20 * 1024 * 1024; // 20MB Pre-load for a smooth start
+                        try {
+                            const response = await fetch(`/api/video/stream/${msgId}`);
+                            const reader = response.body.getReader();
+                            
+                            let receivedLength = 0;
+                            const PREBUFFER_TARGET = 15 * 1024 * 1024; // 15MB to start
+                            let isStarted = false;
 
-                        while(true) {
-                            const {done, value} = await reader.read();
-                            if (done) break;
+                            while (true) {
+                                const {done, value} = await reader.read();
+                                if (done) {
+                                    if (ms.readyState === 'open') ms.endOfStream();
+                                    break;
+                                }
 
-                            chunks.push(value);
-                            receivedLength += value.length;
+                                // Append chunk to video buffer
+                                await new Promise(r => {
+                                    sb.appendBuffer(value);
+                                    sb.onupdateend = r;
+                                });
 
-                            // Update the UI that was previously 'null'
-                            const percent = Math.min((receivedLength / PREBUFFER_LIMIT) * 100, 100);
-                            progressFill.style.width = percent + "%";
-                            loadPercent.innerText = `${Math.round(percent)}% PRE-LOADED`;
+                                receivedLength += value.length;
 
-                            // Once we have 20MB, start the player
-                            if (receivedLength >= PREBUFFER_LIMIT) {
-                                loadState.innerText = "BUFFER STABLE // PLAYING";
-                                loadState.style.color = "#0f0";
-                                break; 
+                                // Update Progress UI
+                                const percent = Math.min((receivedLength / PREBUFFER_TARGET) * 100, 100);
+                                progressFill.style.width = percent + "%";
+                                loadPercent.innerText = `${Math.round(percent)}% PRE-LOADED`;
+
+                                // Start playback once we have enough data
+                                if (receivedLength >= PREBUFFER_TARGET && !isStarted) {
+                                    isStarted = true;
+                                    loadState.innerText = "STABLE // PLAYING";
+                                    loadState.style.color = "#0f0";
+                                    player.play().catch(() => {
+                                        console.log("Waiting for user interaction to play...");
+                                    });
+                                }
                             }
+                        } catch (err) {
+                            console.error("Stream Error:", err);
+                            loadState.innerText = "STREAM INTERRUPTED";
+                            loadState.style.color = "red";
                         }
+                    });
 
-                        // Create a temporary Blob to kickstart the movie instantly
-                        const blob = new Blob(chunks, { type: 'video/mp4' });
-                        player.src = URL.createObjectURL(blob);
-                        
-                        player.load();
-                        player.play();
-
-                        // Subtitles track injection
-                        if (video.subtitle_url) {
-                            const track = document.createElement('track');
-                            track.kind = 'subtitles';
-                            track.src = video.subtitle_url;
-                            track.srclang = 'en';
-                            track.label = "English";
-                            track.default = true;
-                            player.appendChild(track);
-                        }
-
-                    } catch (err) {
-                        console.error("Stream failed:", err);
-                        loadState.innerText = "CONNECTION TIMEOUT";
-                        loadState.style.color = "red";
+                    // Subtitles (keep these separate)
+                    if (video.subtitle_url) {
+                        const track = document.createElement('track');
+                        track.kind = 'subtitles';
+                        track.src = video.subtitle_url;
+                        track.srclang = 'en';
+                        track.default = true;
+                        player.appendChild(track);
                     }
 
                     window.scrollTo({ top: 0, behavior: 'smooth' });
