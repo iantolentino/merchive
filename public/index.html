@@ -158,6 +158,8 @@
                 card.onclick = async () => {
                     const player = document.getElementById('main-player');
                     const playerCont = document.getElementById('player-container');
+                    
+                    // Get the UI elements
                     const loadState = document.getElementById('load-state');
                     const loadPercent = document.getElementById('load-percentage');
                     const progressFill = document.getElementById('progress-bar-fill');
@@ -166,20 +168,19 @@
                     player.pause();
                     player.src = "";
                     
-                    loadState.innerText = "PREPARING ENGINE...";
+                    loadState.innerText = "INITIALIZING STREAM...";
                     loadState.style.color = "orange";
                     progressFill.style.width = "0%";
 
                     try {
-                        // 1. Start the Stream Fetch
+                        // Start the manual fetch
                         const response = await fetch(`/api/video/stream/${msgId}`);
                         const reader = response.body.getReader();
                         
                         let receivedLength = 0;
                         let chunks = []; 
-                        const PREBUFFER_LIMIT = 15 * 1024 * 1024; // 15MB (approx 30-60s of 1080p)
+                        const PREBUFFER_LIMIT = 20 * 1024 * 1024; // 20MB Pre-load for a smooth start
 
-                        // 2. Pre-loading Loop
                         while(true) {
                             const {done, value} = await reader.read();
                             if (done) break;
@@ -187,50 +188,46 @@
                             chunks.push(value);
                             receivedLength += value.length;
 
-                            // Update Progress UI
+                            // Update the UI that was previously 'null'
                             const percent = Math.min((receivedLength / PREBUFFER_LIMIT) * 100, 100);
                             progressFill.style.width = percent + "%";
-                            loadPercent.innerText = `PRE-LOADING: ${Math.round(percent)}%`;
+                            loadPercent.innerText = `${Math.round(percent)}% PRE-LOADED`;
 
-                            // 3. Once we hit the limit, start playing while the rest continues
+                            // Once we have 20MB, start the player
                             if (receivedLength >= PREBUFFER_LIMIT) {
-                                loadState.innerText = "STABILIZED // PLAYING";
+                                loadState.innerText = "BUFFER STABLE // PLAYING";
                                 loadState.style.color = "#0f0";
                                 break; 
                             }
                         }
 
-                        // 4. Create a Blob from the first 15MB to kickstart the player
+                        // Create a temporary Blob to kickstart the movie instantly
                         const blob = new Blob(chunks, { type: 'video/mp4' });
-                        const blobUrl = URL.createObjectURL(blob);
+                        player.src = URL.createObjectURL(blob);
                         
-                        // 5. Hand over to the player
-                        player.src = blobUrl;
-                        
-                        // Note: For a 900MB file, after the blob finishes, 
-                        // the player will naturally request the rest via the standard stream.
                         player.load();
                         player.play();
 
-                        // 6. Subtitles Injection
+                        // Subtitles track injection
                         if (video.subtitle_url) {
                             const track = document.createElement('track');
                             track.kind = 'subtitles';
                             track.src = video.subtitle_url;
                             track.srclang = 'en';
+                            track.label = "English";
                             track.default = true;
                             player.appendChild(track);
                         }
 
                     } catch (err) {
-                        console.error("Pre-load failed:", err);
-                        loadState.innerText = "CONNECTION FAILED";
+                        console.error("Stream failed:", err);
+                        loadState.innerText = "CONNECTION TIMEOUT";
                         loadState.style.color = "red";
                     }
 
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
-                                
+                    
                 container.appendChild(card);
             });
         } catch (err) {
