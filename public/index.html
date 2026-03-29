@@ -125,39 +125,82 @@
                     if(delBtn) delBtn.style.display = 'block';
                 }
 
-                card.onclick = () => {
+                card.onclick = async () => {
                     const player = document.getElementById('main-player');
                     const playerCont = document.getElementById('player-container');
+                    const loadState = document.getElementById('load-state');
+                    const loadPercent = document.getElementById('load-percentage');
+                    const progressFill = document.getElementById('progress-bar-fill');
                     
                     playerCont.style.display = 'block';
                     player.pause();
-                    player.innerHTML = ''; // Reset for new video
+                    player.src = "";
                     
-                    // 1. Inject Video Source
-                    const source = document.createElement('source');
-                    source.src = `/api/video/stream/${msgId}`;
-                    source.type = 'video/mp4';
-                    player.appendChild(source);
+                    loadState.innerText = "PREPARING ENGINE...";
+                    loadState.style.color = "orange";
+                    progressFill.style.width = "0%";
 
-                    // 2. Inject Subtitles if they exist
-                    if (video.subtitle_url) {
-                        const track = document.createElement('track');
-                        track.kind = 'subtitles';
-                        track.label = 'English';
-                        track.srclang = 'en';
-                        track.src = video.subtitle_url;
-                        track.default = true;
-                        player.appendChild(track);
+                    try {
+                        // 1. Start the Stream Fetch
+                        const response = await fetch(`/api/video/stream/${msgId}`);
+                        const reader = response.body.getReader();
+                        
+                        let receivedLength = 0;
+                        let chunks = []; 
+                        const PREBUFFER_LIMIT = 15 * 1024 * 1024; // 15MB (approx 30-60s of 1080p)
+
+                        // 2. Pre-loading Loop
+                        while(true) {
+                            const {done, value} = await reader.read();
+                            if (done) break;
+
+                            chunks.push(value);
+                            receivedLength += value.length;
+
+                            // Update Progress UI
+                            const percent = Math.min((receivedLength / PREBUFFER_LIMIT) * 100, 100);
+                            progressFill.style.width = percent + "%";
+                            loadPercent.innerText = `PRE-LOADING: ${Math.round(percent)}%`;
+
+                            // 3. Once we hit the limit, start playing while the rest continues
+                            if (receivedLength >= PREBUFFER_LIMIT) {
+                                loadState.innerText = "STABILIZED // PLAYING";
+                                loadState.style.color = "#0f0";
+                                break; 
+                            }
+                        }
+
+                        // 4. Create a Blob from the first 15MB to kickstart the player
+                        const blob = new Blob(chunks, { type: 'video/mp4' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        
+                        // 5. Hand over to the player
+                        player.src = blobUrl;
+                        
+                        // Note: For a 900MB file, after the blob finishes, 
+                        // the player will naturally request the rest via the standard stream.
+                        player.load();
+                        player.play();
+
+                        // 6. Subtitles Injection
+                        if (video.subtitle_url) {
+                            const track = document.createElement('track');
+                            track.kind = 'subtitles';
+                            track.src = video.subtitle_url;
+                            track.srclang = 'en';
+                            track.default = true;
+                            player.appendChild(track);
+                        }
+
+                    } catch (err) {
+                        console.error("Pre-load failed:", err);
+                        loadState.innerText = "CONNECTION FAILED";
+                        loadState.style.color = "red";
                     }
 
-                    player.load();
-                    player.play().catch(e => {
-                        console.log("Autoplay prevented, user must click play.");
-                    });
-                    
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
-                
+                                
                 container.appendChild(card);
             });
         } catch (err) {
