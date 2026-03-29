@@ -3,143 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <title>VESTA // MERCHIVE</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='black'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='central' text-anchor='middle' fill='white' font-family='monospace' font-weight='bold' font-size='35'%3EPVM%3C/text%3E%3C/svg%3E">
     <style>
         body { background: #050505; color: #eee; font-family: 'Courier New', monospace; padding: 40px; margin: 0; }
-        .header { border-bottom: 1px solid #222; margin-bottom: 30px; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
-        .nav-links a { color: #666; text-decoration: none; font-size: 0.8rem; margin-left: 20px; cursor: pointer; display: none; }
-        .nav-links a:hover { color: #fff; }
-        
         #player-container { position: relative; margin-bottom: 50px; display: none; border: 1px solid #333; background: #000; width: 100%; }
         video { width: 100%; display: block; max-height: 70vh; }
         
-        /* PROGRESS & BUFFER BAR */
-        .progress-wrapper { width: 100%; height: 6px; background: #111; position: relative; cursor: pointer; }
-        .buffer-bar { position: absolute; height: 100%; background: #333; width: 0%; z-index: 1; transition: width 0.2s; }
+        .progress-container { width: 100%; height: 10px; background: #111; position: relative; }
+        .buffer-bar { position: absolute; height: 100%; background: #444; width: 0%; z-index: 1; }
         .play-bar { position: absolute; height: 100%; background: #0f0; width: 0%; z-index: 2; }
-
-        .close-btn { position: absolute; top: 15px; right: 15px; background: #fff; color: #000; border: none; width: 30px; height: 30px; cursor: pointer; z-index: 100; font-weight: bold; }
+        
+        #loading-text { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #0f0; color: #0f0; font-size: 0.8rem; }
+        
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        .video-card { border: 1px solid #222; cursor: pointer; transition: 0.3s; background: #0a0a0a; position: relative; }
-        .video-card:hover { border-color: #555; background: #111; }
-        .card-visual { height: 160px; display: flex; align-items: center; justify-content: center; background: #111; border-bottom: 1px solid #222; text-align: center; padding: 20px; overflow: hidden; }
-        .card-visual span { color: #444; font-size: 0.8rem; text-transform: uppercase; }
-        .video-info { padding: 15px; }
-        .video-info h3 { font-size: 0.9rem; margin: 0; color: #fff; }
-        .delete-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,0,0,0.8); border: 1px solid red; color: white; cursor: pointer; display: none; z-index: 10; padding: 2px 5px; font-size: 10px; }
+        .video-card { border: 1px solid #222; cursor: pointer; padding: 15px; background: #0a0a0a; }
+        .close-btn { position: absolute; top: 10px; right: 10px; z-index: 100; cursor: pointer; background: #fff; border: none; padding: 5px 10px; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <div>
-            <h1>PROJECT VESTA // MERCHIVE</h1>
-            <p style="color: #444; font-size: 0.7rem;">STATUS: <span style="color: #0f0;">ONLINE</span></p>
-        </div>
-        <div class="nav-links" id="nav-links">
-            <a href="/admin" id="admin-link">+ ADD_VIDEO</a>
-            <a onclick="logout()" id="logout-link">[ LOGOUT ]</a>
-        </div>
-    </div>
+    <h1>PROJECT VESTA // MERCHIVE</h1>
 
     <div id="player-container">
-        <button class="close-btn" onclick="closePlayer()">×</button>
+        <button class="close-btn" onclick="closePlayer()">CLOSE</button>
+        <div id="loading-text">BUFFERING DATA...</div>
         <video id="main-player" controls crossorigin="anonymous"></video>
-        <div class="progress-wrapper" id="progress-container">
-            <div class="buffer-bar" id="buffer-bar"></div>
-            <div class="play-bar" id="play-bar"></div>
+        <div class="progress-container">
+            <div id="buffer-bar" class="buffer-bar"></div>
+            <div id="play-bar" class="play-bar"></div>
         </div>
     </div>
 
     <div class="grid" id="video-grid"></div>
 
-<script>
-    const token = localStorage.getItem('access_token');
-    const player = document.getElementById('main-player');
-    const bufferBar = document.getElementById('buffer-bar');
-    const playBar = document.getElementById('play-bar');
+    <script>
+        const player = document.getElementById('main-player');
+        const bufferBar = document.getElementById('buffer-bar');
+        const playBar = document.getElementById('play-bar');
+        const loader = document.getElementById('loading-text');
 
-    // BUFFERING LOGIC
-    player.addEventListener('progress', () => {
-        if (player.duration > 0) {
-            for (let i = 0; i < player.buffered.length; i++) {
-                if (player.buffered.start(player.buffered.length - 1 - i) < player.currentTime) {
-                    const bufferedEnd = player.buffered.end(player.buffered.length - 1 - i);
-                    const width = (bufferedEnd / player.duration) * 100;
-                    bufferBar.style.width = width + "%";
-                    break;
-                }
+        // Update Bars
+        player.addEventListener('timeupdate', () => {
+            playBar.style.width = (player.currentTime / player.duration * 100) + "%";
+        });
+
+        player.addEventListener('progress', () => {
+            if (player.buffered.length > 0) {
+                const bufferedEnd = player.buffered.end(player.buffered.length - 1);
+                bufferBar.style.width = (bufferedEnd / player.duration * 100) + "%";
             }
-        }
-    });
+        });
 
-    // PLAYBACK LOGIC
-    player.addEventListener('timeupdate', () => {
-        if (player.duration > 0) {
-            const width = (player.currentTime / player.duration) * 100;
-            playBar.style.width = width + "%";
-        }
-    });
+        // Loading Indicator
+        player.addEventListener('waiting', () => loader.style.display = 'block');
+        player.addEventListener('playing', () => loader.style.display = 'none');
 
-    function updateUI() {
-        const adminLink = document.getElementById('admin-link');
-        const logoutLink = document.getElementById('logout-link');
-        if (token) {
-            adminLink.style.display = 'inline';
-            logoutLink.style.display = 'inline';
-        }
-    }
-    
-    function logout() {
-        localStorage.removeItem('access_token');
-        window.location.href = '/'; 
-    }
-
-    function closePlayer() {
-        player.pause();
-        player.src = "";
-        player.load(); 
-        document.getElementById('player-container').style.display = 'none';
-    }
-
-    async function loadArchive() {
-        try {
+        async function loadArchive() {
             const res = await fetch('/api/videos/list');
             const result = await res.json();
             const container = document.getElementById('video-grid');
-            container.innerHTML = '';
-
             result.data.forEach(video => {
-                const msgId = video.tg_file_ids[0];
                 const card = document.createElement('div');
                 card.className = 'video-card';
-                card.innerHTML = `
-                    <button class="delete-btn" onclick="deleteVideo('${video.id}', event)">DEL</button>
-                    <div class="card-visual"><span>${video.title}</span></div>
-                    <div class="video-info">
-                        <h3>${video.title}</h3>
-                        <p style="color:#555; font-size:0.6rem;">${(video.category || 'Uncategorized').toUpperCase()}</p>
-                    </div>
-                `;
-                
-                if(token) card.querySelector('.delete-btn').style.display = 'block';
-
+                card.innerHTML = `<h3>${video.title}</h3>`;
                 card.onclick = () => {
                     document.getElementById('player-container').style.display = 'block';
-                    player.src = `/api/video/stream/${msgId}`;
-                    player.load();
+                    player.src = `/api/video/stream/${video.tg_file_ids[0]}`;
                     player.play();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
                 container.appendChild(card);
             });
-        } catch (err) {
-            console.error(err);
         }
-    }
 
-    updateUI();
-    loadArchive();
-</script>
+        function closePlayer() {
+            player.pause();
+            player.src = "";
+            document.getElementById('player-container').style.display = 'none';
+        }
+
+        loadArchive();
+    </script>
 </body>
 </html>
