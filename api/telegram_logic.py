@@ -27,8 +27,9 @@ async def ensure_connected():
 
 async def stream_telegram_file(message_id: int, offset: int = 0, limit: int = None):
     """
-    REQUIRED: This function now accepts offset and limit 
-    to support smooth seeking and prevent 40s crashes.
+    FIXED: Now properly handles Byte-Ranges.
+    This allows the browser to request the video in 1MB chunks
+    without the connection timing out.
     """
     try:
         tg = await ensure_connected()
@@ -38,15 +39,15 @@ async def stream_telegram_file(message_id: int, offset: int = 0, limit: int = No
         message = await tg.get_messages(target, ids=message_id)
         
         if not message or not message.media:
-            logger.error(f"No media for ID {message_id}")
+            logger.error(f"No media found for ID {message_id}")
             return
 
-        # iter_download needs these specific parameters to 'seek' inside the file
+        # CRITICAL FIX: iter_download MUST use offset and limit
         async for chunk in tg.iter_download(
             message.media,
-            offset=offset,
-            limit=limit,
-            request_size=256 * 1024, # 256KB is the sweet spot for Railway stability
+            offset=offset,      # Start at this byte
+            limit=limit,        # Only download this many bytes
+            request_size=128 * 1024, # 128KB chunks for better flow
         ):
             if chunk:
                 yield chunk

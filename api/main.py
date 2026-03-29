@@ -36,7 +36,7 @@ async def startup_event():
     await ensure_connected()
     logger.info("✅ VESTA CORE: ONLINE")
 
-# --- STREAMING FIX ---
+# --- STREAMING LOGIC ---
 @app.get("/api/video/stream/{message_id}")
 async def video_stream(message_id: str, request: Request):
     try:
@@ -51,13 +51,12 @@ async def video_stream(message_id: str, request: Request):
         file_size = message.media.document.size
         range_header = request.headers.get("range")
 
-        # Handle the Byte-Range Request
         if range_header:
             range_str = range_header.replace("bytes=", "")
             parts = range_str.split("-")
             start = int(parts[0])
             
-            # Requesting 1MB at a time keeps the connection "fresh"
+            # 1MB Chunk size for Railway stability
             chunk_size = 1024 * 1024 
             end = int(parts[1]) if (len(parts) > 1 and parts[1]) else min(start + chunk_size, file_size - 1)
             content_length = (end - start) + 1
@@ -70,10 +69,11 @@ async def video_stream(message_id: str, request: Request):
                     "Accept-Ranges": "bytes",
                     "Content-Length": str(content_length),
                     "Content-Type": "video/mp4",
+                    "Cache-Control": "no-cache",
                 }
             )
 
-        # Full stream fallback
+        # Fallback for full download
         return StreamingResponse(
             stream_telegram_file(m_id),
             media_type="video/mp4",
@@ -87,7 +87,6 @@ async def video_stream(message_id: str, request: Request):
         logger.error(f"Stream Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- ROUTES ---
 @app.get("/api/videos/list")
 async def list_videos():
     response = supabase.table("videos").select("*").execute()

@@ -7,11 +7,17 @@
     <style>
         body { background: #050505; color: #eee; font-family: 'Courier New', monospace; padding: 40px; margin: 0; }
         .header { border-bottom: 1px solid #222; margin-bottom: 30px; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
-        /* Hide nav links by default, JS will show them if token exists */
         .nav-links a { color: #666; text-decoration: none; font-size: 0.8rem; margin-left: 20px; cursor: pointer; display: none; }
         .nav-links a:hover { color: #fff; }
+        
         #player-container { position: relative; margin-bottom: 50px; display: none; border: 1px solid #333; background: #000; width: 100%; }
         video { width: 100%; display: block; max-height: 70vh; }
+        
+        /* PROGRESS & BUFFER BAR */
+        .progress-wrapper { width: 100%; height: 6px; background: #111; position: relative; cursor: pointer; }
+        .buffer-bar { position: absolute; height: 100%; background: #333; width: 0%; z-index: 1; transition: width 0.2s; }
+        .play-bar { position: absolute; height: 100%; background: #0f0; width: 0%; z-index: 2; }
+
         .close-btn { position: absolute; top: 15px; right: 15px; background: #fff; color: #000; border: none; width: 30px; height: 30px; cursor: pointer; z-index: 100; font-weight: bold; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
         .video-card { border: 1px solid #222; cursor: pointer; transition: 0.3s; background: #0a0a0a; position: relative; }
@@ -38,26 +44,49 @@
 
     <div id="player-container">
         <button class="close-btn" onclick="closePlayer()">×</button>
-        <video id="main-player" controls crossorigin="anonymous">
-            </video>
+        <video id="main-player" controls crossorigin="anonymous"></video>
+        <div class="progress-wrapper" id="progress-container">
+            <div class="buffer-bar" id="buffer-bar"></div>
+            <div class="play-bar" id="play-bar"></div>
+        </div>
     </div>
 
     <div class="grid" id="video-grid"></div>
 
 <script>
     const token = localStorage.getItem('access_token');
+    const player = document.getElementById('main-player');
+    const bufferBar = document.getElementById('buffer-bar');
+    const playBar = document.getElementById('play-bar');
 
-    // UI Toggle Logic: Runs immediately to show/hide admin buttons
+    // BUFFERING LOGIC
+    player.addEventListener('progress', () => {
+        if (player.duration > 0) {
+            for (let i = 0; i < player.buffered.length; i++) {
+                if (player.buffered.start(player.buffered.length - 1 - i) < player.currentTime) {
+                    const bufferedEnd = player.buffered.end(player.buffered.length - 1 - i);
+                    const width = (bufferedEnd / player.duration) * 100;
+                    bufferBar.style.width = width + "%";
+                    break;
+                }
+            }
+        }
+    });
+
+    // PLAYBACK LOGIC
+    player.addEventListener('timeupdate', () => {
+        if (player.duration > 0) {
+            const width = (player.currentTime / player.duration) * 100;
+            playBar.style.width = width + "%";
+        }
+    });
+
     function updateUI() {
         const adminLink = document.getElementById('admin-link');
         const logoutLink = document.getElementById('logout-link');
-        
         if (token) {
             adminLink.style.display = 'inline';
             logoutLink.style.display = 'inline';
-        } else {
-            adminLink.style.display = 'none';
-            logoutLink.style.display = 'none';
         }
     }
     
@@ -67,30 +96,10 @@
     }
 
     function closePlayer() {
-        const player = document.getElementById('main-player');
         player.pause();
-        player.innerHTML = ""; // Clear sources and tracks
         player.src = "";
         player.load(); 
         document.getElementById('player-container').style.display = 'none';
-    }
-
-    async function deleteVideo(id, event) {
-        event.stopPropagation();
-        if (!confirm("DELETE VIDEO?")) return;
-        try {
-            const res = await fetch(`/api/videos/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                location.reload();
-            } else {
-                alert("Failed to delete video.");
-            }
-        } catch (err) {
-            console.error("Delete error:", err);
-        }
     }
 
     async function loadArchive() {
@@ -98,17 +107,10 @@
             const res = await fetch('/api/videos/list');
             const result = await res.json();
             const container = document.getElementById('video-grid');
-            
-            if (!result.data || result.data.length === 0) {
-                container.innerHTML = '<p style="color:#444;">NO VIDEOS FOUND IN ARCHIVE.</p>';
-                return;
-            }
-
             container.innerHTML = '';
 
             result.data.forEach(video => {
-                const msgId = (video.tg_file_ids && video.tg_file_ids.length > 0) ? video.tg_file_ids[0] : null;
-                
+                const msgId = video.tg_file_ids[0];
                 const card = document.createElement('div');
                 card.className = 'video-card';
                 card.innerHTML = `
@@ -120,53 +122,22 @@
                     </div>
                 `;
                 
-                if(token) {
-                    const delBtn = card.querySelector('.delete-btn');
-                    if(delBtn) delBtn.style.display = 'block';
-                }
+                if(token) card.querySelector('.delete-btn').style.display = 'block';
 
                 card.onclick = () => {
-                    const player = document.getElementById('main-player');
-                    const playerCont = document.getElementById('player-container');
-                    
-                    playerCont.style.display = 'block';
-                    player.pause();
-                    player.innerHTML = ''; // Reset for new video
-                    
-                    // 1. Inject Video Source
-                    const source = document.createElement('source');
-                    source.src = `/api/video/stream/${msgId}`;
-                    source.type = 'video/mp4';
-                    player.appendChild(source);
-
-                    // 2. Inject Subtitles if they exist
-                    if (video.subtitle_url) {
-                        const track = document.createElement('track');
-                        track.kind = 'subtitles';
-                        track.label = 'English';
-                        track.srclang = 'en';
-                        track.src = video.subtitle_url;
-                        track.default = true;
-                        player.appendChild(track);
-                    }
-
+                    document.getElementById('player-container').style.display = 'block';
+                    player.src = `/api/video/stream/${msgId}`;
                     player.load();
-                    player.play().catch(e => {
-                        console.log("Autoplay prevented, user must click play.");
-                    });
-                    
+                    player.play();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
-                
                 container.appendChild(card);
             });
         } catch (err) {
-            console.error("Failed to load archive:", err);
-            document.getElementById('video-grid').innerHTML = '<p style="color:red;">SERVER ERROR: FAILED TO FETCH VIDEO LIST.</p>';
+            console.error(err);
         }
     }
 
-    // Execute on Load
     updateUI();
     loadArchive();
 </script>
