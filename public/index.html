@@ -157,41 +157,38 @@
                     const loader = document.getElementById('loading-overlay');
                     
                     playerCont.style.display = 'block';
-                    loader.style.display = 'flex'; // Show loader
+                    loader.style.display = 'flex';
                     
                     player.pause();
                     player.innerHTML = ''; 
-                    
-                    const source = document.createElement('source');
-                    source.src = `/api/video/stream/${msgId}`;
-                    source.type = 'video/mp4';
-                    player.appendChild(source);
 
+                    // Adding a timestamp ?t= makes the browser treat every click as a "Fresh Start"
+                    player.src = `/api/video/stream/${msgId}?t=${Date.now()}`;
+
+                    // ADD SUBTITLES
                     if (video.subtitle_url) {
                         const track = document.createElement('track');
                         track.kind = 'subtitles';
-                        track.label = 'English';
-                        track.srclang = 'en';
                         track.src = video.subtitle_url;
+                        track.srclang = 'en';
                         track.default = true;
                         player.appendChild(track);
                     }
 
                     player.load();
 
-                    // Hide loader only when enough data is buffered to start playing
+                    // SPEED FIX: Don't wait 5 minutes. 
+                    // This event fires as soon as the browser has enough to start.
                     player.oncanplay = () => {
                         loader.style.display = 'none';
-                        player.play();
+                        player.play().catch(e => console.log("Manual play required"));
                     };
 
-                    // If it stalls during the movie, show a small hint
+                    // If it stops at 4 mins, show the loader so you know it's re-connecting
                     player.onwaiting = () => {
                         loader.style.display = 'flex';
-                        loader.querySelector('span').innerText = "RE-BUFFERING...";
+                        loader.querySelector('span').innerText = "BUFFERING NEXT SEGMENT...";
                     };
-
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
                 container.appendChild(card);
             });

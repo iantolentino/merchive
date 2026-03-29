@@ -63,17 +63,13 @@ async def stream_telegram_file(message_id: str):
         if not message or not message.media:
             return
 
-        # VERCEL STRATEGY: 
-        # We use 128KB chunks to ensure constant data flow to the client.
-        # This prevents Vercel from thinking the connection is idle.
+        # 256KB is the "Safe Zone" for Vercel Free Tier
         async for chunk in tg.iter_download(
             message.media, 
-            request_size=128 * 1024 
+            request_size=256 * 1024, 
+            buffer_size=1 * 1024 * 1024 # Pre-fetches 1MB to stay ahead
         ):
             if chunk:
                 yield chunk
-            else:
-                # Keep-alive: send a null byte if Telegram is momentarily silent
-                yield b'\x00'
     except Exception as e:
         logger.error(f"Stream Error: {e}")
