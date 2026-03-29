@@ -12,7 +12,7 @@ from loguru import logger
 from database import supabase
 from models import LoginRequest, TokenResponse
 from auth import ADMIN_SECRET, create_access_token, verify_admin
-from telegram_logic import stream_telegram_file, client, BOT_TOKEN, ensure_connected
+from telegram_logic import stream_telegram_file, client, ensure_connected
 
 # --- Setup Paths ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -39,6 +39,7 @@ async def ensure_connected():
 @app.on_event("startup")
 async def startup_event():
     try:
+        # This now uses the logic from telegram_logic.py
         await ensure_connected()
         logger.info("✅ TELEGRAM_BOT: ONLINE.")
     except Exception as e:
