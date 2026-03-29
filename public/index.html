@@ -2,102 +2,78 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VESTA // MERCHIVE</title>
     <style>
-        body { background: #050505; color: #eee; font-family: 'Courier New', monospace; padding: 40px; margin: 0; }
-        .header { border-bottom: 1px solid #222; margin-bottom: 30px; padding-bottom: 10px; }
-        
-        #player-container { position: relative; margin-bottom: 50px; display: none; border: 1px solid #333; background: #000; width: 100%; }
-        video { width: 100%; display: block; max-height: 70vh; }
-        
-        /* THE PROGRESS BAR */
-        .progress-wrapper { width: 100%; height: 8px; background: #111; position: relative; overflow: hidden; }
-        .buffer-bar { position: absolute; height: 100%; background: #333; width: 0%; z-index: 1; transition: width 0.3s; }
-        .play-bar { position: absolute; height: 100%; background: #0f0; width: 0%; z-index: 2; }
-        
-        #status-overlay { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; background: rgba(0,0,0,0.8); padding: 15px; border: 1px solid #0f0; color: #0f0; font-size: 0.8rem; }
-
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        .video-card { border: 1px solid #222; cursor: pointer; padding: 15px; background: #0a0a0a; transition: 0.2s; }
-        .video-card:hover { border-color: #555; background: #111; }
-        .close-btn { position: absolute; top: 10px; right: 10px; z-index: 100; cursor: pointer; background: #fff; color: #000; border: none; padding: 5px 10px; font-weight: bold; }
+        body { background: #050505; color: #eee; font-family: 'Courier New', monospace; padding: 20px; margin: 0; }
+        #player-container { position: relative; margin-bottom: 30px; display: none; background: #000; border: 1px solid #333; }
+        video { width: 100%; display: block; max-height: 80vh; background: #000; }
+        .progress-bar { width: 100%; height: 5px; background: #111; position: relative; }
+        .buffer-fill { position: absolute; height: 100%; background: #222; width: 0%; z-index: 1; transition: width 0.2s; }
+        .play-fill { position: absolute; height: 100%; background: #0f0; width: 0%; z-index: 2; }
+        #loader { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; color: #0f0; font-size: 0.7rem; background: rgba(0,0,0,0.9); padding: 10px; border: 1px solid #0f0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+        .card { border: 1px solid #222; padding: 15px; cursor: pointer; background: #0a0a0a; }
+        .close-btn { position: absolute; top: 10px; right: 10px; z-index: 10; background: #fff; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1>PROJECT VESTA // MERCHIVE</h1>
-        <p style="color: #444; font-size: 0.7rem;">INFRASTRUCTURE: RAILWAY.APP</p>
-    </div>
+    <h2 style="letter-spacing: 2px;">PROJECT VESTA</h2>
 
     <div id="player-container">
-        <button class="close-btn" onclick="closePlayer()">×</button>
-        <div id="status-overlay">CONNECTING TO TELEGRAM...</div>
-        <video id="main-player" controls crossorigin="anonymous"></video>
-        <div class="progress-wrapper">
-            <div id="buffer-bar" class="buffer-bar"></div>
-            <div id="play-bar" class="play-bar"></div>
+        <button class="close-btn" onclick="closePlayer()">CLOSE</button>
+        <div id="loader">BUFFERING...</div>
+        <video id="video-player" controls playsinline preload="metadata" crossorigin="anonymous"></video>
+        <div class="progress-bar">
+            <div id="buffer-bar" class="buffer-fill"></div>
+            <div id="play-bar" class="play-fill"></div>
         </div>
     </div>
 
-    <div class="grid" id="video-grid"></div>
+    <div id="grid" class="grid"></div>
 
     <script>
-        const player = document.getElementById('main-player');
-        const bufferBar = document.getElementById('buffer-bar');
-        const playBar = document.getElementById('play-bar');
-        const overlay = document.getElementById('status-overlay');
+        const v = document.getElementById('video-player');
+        const bBar = document.getElementById('buffer-bar');
+        const pBar = document.getElementById('play-bar');
+        const load = document.getElementById('loader');
 
-        // TRACK PROGRESS & BUFFERING
-        player.addEventListener('timeupdate', () => {
-            const percent = (player.currentTime / player.duration) * 100;
-            playBar.style.width = percent + "%";
-        });
+        v.onwaiting = () => load.style.display = 'block';
+        v.onplaying = () => load.style.display = 'none';
 
-        player.addEventListener('progress', () => {
-            if (player.buffered.length > 0) {
-                const bufferedEnd = player.buffered.end(player.buffered.length - 1);
-                const percent = (bufferedEnd / player.duration) * 100;
-                bufferBar.style.width = percent + "%";
+        v.ontimeupdate = () => {
+            pBar.style.width = (v.currentTime / v.duration * 100) + "%";
+            if (v.buffered.length > 0) {
+                bBar.style.width = (v.buffered.end(v.buffered.length-1) / v.duration * 100) + "%";
             }
-        });
+        };
 
-        // LOADING FEEDBACK
-        player.addEventListener('waiting', () => overlay.style.display = 'block');
-        player.addEventListener('playing', () => overlay.style.display = 'none');
-
-        async function loadVideos() {
-            try {
-                const res = await fetch('/api/videos/list');
-                const result = await res.json();
-                const container = document.getElementById('video-grid');
-                container.innerHTML = '';
-
-                result.data.forEach(video => {
-                    const card = document.createElement('div');
-                    card.className = 'video-card';
-                    card.innerHTML = `<h3>${video.title}</h3><p style="color:#555; font-size:0.6rem;">${video.category}</p>`;
-                    card.onclick = () => {
-                        document.getElementById('player-container').style.display = 'block';
-                        player.src = `/api/video/stream/${video.tg_file_ids[0]}`;
-                        player.load();
-                        player.play();
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                    };
-                    container.appendChild(card);
-                });
-            } catch (e) {
-                console.error("Fetch error:", e);
-            }
+        async function loadGrid() {
+            const res = await fetch('/api/videos/list');
+            const { data } = await res.json();
+            const grid = document.getElementById('grid');
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `<strong>${item.title}</strong><br><small>${item.category}</small>`;
+                div.onclick = () => {
+                    document.getElementById('player-container').style.display = 'block';
+                    v.src = `/api/video/stream/${item.tg_file_ids[0]}`;
+                    v.play();
+                    window.scrollTo(0,0);
+                };
+                grid.appendChild(div);
+            });
         }
 
         function closePlayer() {
-            player.pause();
-            player.src = "";
+            v.pause();
+            v.src = "";
             document.getElementById('player-container').style.display = 'none';
         }
 
-        loadVideos();
+        loadGrid();
     </script>
 </body>
 </html>
