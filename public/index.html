@@ -111,34 +111,32 @@
                 }
 
                 card.onclick = () => {
-                    if (!msgId) {
-                        alert("Error: No Telegram message ID associated with this video.");
-                        return;
+                    const player = document.getElementById('main-player');
+                    const container = document.getElementById('player-container');
+                    
+                    container.style.display = 'block';
+                    player.pause();
+                    player.innerHTML = ''; // Clear previous tracks
+                    
+                    // 1. Add the Video Source
+                    const source = document.createElement('source');
+                    source.src = `/api/video/stream/${msgId}`;
+                    source.type = 'video/mp4';
+                    player.appendChild(source);
+
+                    // 2. Add Subtitles (if they exist in your DB)
+                    if (video.subtitle_url) {
+                        const track = document.createElement('track');
+                        track.kind = 'subtitles';
+                        track.label = 'English';
+                        track.srclang = 'en';
+                        track.src = video.subtitle_url;
+                        track.default = true;
+                        player.appendChild(track);
                     }
 
-                    const player = document.getElementById('main-player');
-                    const playerContainer = document.getElementById('player-container');
-                    
-                    playerContainer.style.display = 'block';
-                    player.pause();
-                    player.src = ""; 
                     player.load();
-                
-                    // Point to the streaming endpoint
-                    player.src = `/api/video/stream/${msgId}`;
-                
-                    player.oncanplay = () => {
-                        player.play().catch(() => {
-                            player.muted = true;
-                            player.play();
-                        });
-                    };
-                
-                    player.onerror = () => {
-                        console.error("Vesta_Stream_Error Code:", player.error.code);
-                        alert("Failed to load stream. Check Vercel logs for Telegram connection status.");
-                    };
-                
+                    player.play();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
                 

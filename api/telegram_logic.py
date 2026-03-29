@@ -38,7 +38,10 @@ async def stream_telegram_file(message_id: str):
         if not message or not message.media:
             return
 
-        async for chunk in tg.iter_download(message.media, request_size=256 * 1024):
+        async for chunk in tg.iter_download(
+            message.media, 
+            request_size=512 * 1024 # Increased to 512KB for faster filling of the buffer
+        ):
             if chunk:
                 yield chunk
     except Exception as e:

@@ -8,21 +8,21 @@ from typing import List
 from loguru import logger
 
 # --- INTERNAL IMPORTS ---
-# Using the 'api.' prefix ensures Vercel finds the modules in your subfolder
+# Vercel needs the 'api.' prefix when running as a deployed function
 try:
     from api.database import supabase
     from api.models import LoginRequest, TokenResponse
     from api.auth import ADMIN_SECRET, create_access_token, verify_admin
     from api.telegram_logic import stream_telegram_file, client, ensure_connected
 except ImportError:
-    # Fallback for local testing if not running as a package
+    # Fallback for local development
     from database import supabase
     from models import LoginRequest, TokenResponse
     from auth import ADMIN_SECRET, create_access_token, verify_admin
     from telegram_logic import stream_telegram_file, client, ensure_connected
 
 # --- SETUP PATHS ---
-# os.getcwd() is more reliable on Vercel to find the 'public' folder
+# os.getcwd() is the most reliable way to find the root on Vercel
 BASE_DIR = os.getcwd()
 PUBLIC_PATH = os.path.join(BASE_DIR, "public")
 
@@ -30,6 +30,7 @@ class VideoCreate(BaseModel):
     title: str
     category: str
     tg_file_ids: List[str]
+    subtitle_url: str = None
     is_private: bool = False
 
 app = FastAPI(title="Project Vesta // MC")
@@ -37,7 +38,7 @@ app = FastAPI(title="Project Vesta // MC")
 @app.on_event("startup")
 async def startup_event():
     try:
-        # Uses the logic imported from telegram_logic.py
+        # Calls the function from telegram_logic.py
         await ensure_connected()
         logger.info("✅ TELEGRAM_CONNECTION: SUCCESS")
     except Exception as e:
@@ -88,11 +89,11 @@ async def list_videos():
 @app.get("/api/video/stream/{message_id}")
 async def video_stream(message_id: str, request: Request):
     try:
-        # Ensure client is connected before streaming
+        # Re-verify connection for the stream request
         await ensure_connected()
 
         async def file_generator():
-            # 1. Heartbeat: Prevents Vercel 10s timeout while fetching metadata
+            # 1. Heartbeat: Keeps Vercel connection alive during initial Telegram handshake
             yield b"" 
             
             try:
@@ -122,7 +123,7 @@ async def read_index():
     path = os.path.join(PUBLIC_PATH, "index.html")
     if os.path.exists(path):
         return FileResponse(path)
-    return {"error": "index.html not found"}
+    return {"error": "index.html not found", "checked_path": path}
 
 @app.get("/login")
 async def get_login_page():
@@ -132,6 +133,6 @@ async def get_login_page():
 async def get_admin_page():
     return FileResponse(os.path.join(PUBLIC_PATH, "admin.html"))
 
-# Mount static files (CSS/JS)
+# Mount static files (for your /css and /js folders)
 if os.path.exists(PUBLIC_PATH):
     app.mount("/static", StaticFiles(directory=PUBLIC_PATH), name="static")
