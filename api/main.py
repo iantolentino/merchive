@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from typing import List, Optional
 from loguru import logger
 
-# --- MODULE RESOLUTION ---
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 try:
@@ -21,12 +20,12 @@ except ImportError:
     from api.auth import ADMIN_SECRET, create_access_token, verify_admin
     from api.telegram_logic import stream_telegram_file, client, ensure_connected, CHANNEL_ID
 
-app = FastAPI(title="Project Vesta // Mobile Optimized")
+app = FastAPI(title="Project Vesta // Final Mobile Optimized")
 
 @app.on_event("startup")
 async def startup_event():
     await ensure_connected()
-    logger.info("🚀 VESTA MOBILE CORE: ONLINE")
+    logger.info("🚀 VESTA CORE: ONLINE")
 
 @app.get("/api/video/stream/{message_id}")
 async def video_stream(message_id: str, request: Request):
@@ -42,13 +41,14 @@ async def video_stream(message_id: str, request: Request):
         file_size = message.media.document.size
         range_header = request.headers.get("range")
 
-        # SAFARI/MOBILE PROBE FIX: Force 206 for all initial requests
+        # Start point logic
         start = 0
         if range_header:
             range_str = range_header.replace("bytes=", "")
             start = int(range_str.split("-")[0])
         
-        chunk_size = 1024 * 1024 # 1MB
+        # AGGRESSIVE BUFFER: Force 3MB per request to fill mobile buffers faster
+        chunk_size = 3 * 1024 * 1024 
         end = min(start + chunk_size, file_size - 1)
         content_length = (end - start) + 1
         
