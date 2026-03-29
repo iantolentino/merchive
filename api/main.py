@@ -12,6 +12,7 @@ from api.database import supabase
 from api.models import LoginRequest, TokenResponse
 from api.auth import ADMIN_SECRET, create_access_token, verify_admin
 from api.telegram_logic import stream_telegram_file, client, BOT_TOKEN
+from api.telegram_logic import stream_telegram_file, client, ensure_connected
 
 # --- Setup Paths ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,10 +28,12 @@ app = FastAPI(title="Project Vesta // MC")
 
 # --- BOT CONNECTION HELPER ---
 async def ensure_connected():
-    """Ensures the Telegram client is alive before any operation."""
+    """Ensures the Telegram client is alive using the session logic."""
     if not client.is_connected():
-        logger.info("Connecting to Telegram...")
-        await client.start(bot_token=BOT_TOKEN)
+        logger.info("Connecting to Telegram via Session...")
+        # If SESSION_STRING is present, connect() is enough.
+        # If not, it uses the local .session file.
+        await client.connect() 
     return True
 
 @app.on_event("startup")
@@ -86,14 +89,16 @@ async def video_stream(message_id: str, request: Request):
         await ensure_connected()
 
         async def file_generator():
-            # 2. HEARTBEAT: Send a single empty byte immediately.
-            # This prevents Vercel/Browsers from timing out while 
-            # Telethon is fetching the file metadata.
+            # 1. Immediate Heartbeat to keep the connection open
             yield b"" 
             
-            async for chunk in stream_telegram_file(message_id):
-                if chunk:
-                    yield chunk
+            try:
+                # 2. Get the stream
+                async for chunk in stream_telegram_file(message_id):
+                    if chunk:
+                        yield chunk
+            except Exception as e:
+                logger.error(f"Generator Error: {e}")
 
         # 3. Add 'Accept-Ranges' to satisfy Chrome/Safari players
         return StreamingResponse(
