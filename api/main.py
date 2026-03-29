@@ -7,15 +7,23 @@ from pydantic import BaseModel
 from typing import List
 from loguru import logger
 
-# Internal Imports
+# --- INTERNAL IMPORTS ---
+# Using the 'api.' prefix ensures Vercel finds the modules in your subfolder
+try:
+    from api.database import supabase
+    from api.models import LoginRequest, TokenResponse
+    from api.auth import ADMIN_SECRET, create_access_token, verify_admin
+    from api.telegram_logic import stream_telegram_file, client, ensure_connected
+except ImportError:
+    # Fallback for local testing if not running as a package
+    from database import supabase
+    from models import LoginRequest, TokenResponse
+    from auth import ADMIN_SECRET, create_access_token, verify_admin
+    from telegram_logic import stream_telegram_file, client, ensure_connected
 
-from database import supabase
-from models import LoginRequest, TokenResponse
-from auth import ADMIN_SECRET, create_access_token, verify_admin
-from telegram_logic import stream_telegram_file, client, ensure_connected
-
-# --- Setup Paths ---
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# --- SETUP PATHS ---
+# os.getcwd() is more reliable on Vercel to find the 'public' folder
+BASE_DIR = os.getcwd()
 PUBLIC_PATH = os.path.join(BASE_DIR, "public")
 
 class VideoCreate(BaseModel):
@@ -26,22 +34,12 @@ class VideoCreate(BaseModel):
 
 app = FastAPI(title="Project Vesta // MC")
 
-# --- BOT CONNECTION HELPER ---
-async def ensure_connected():
-    """Ensures the Telegram client is alive using the session logic."""
-    if not client.is_connected():
-        logger.info("Connecting to Telegram via Session...")
-        # If SESSION_STRING is present, connect() is enough.
-        # If not, it uses the local .session file.
-        await client.connect() 
-    return True
-
 @app.on_event("startup")
 async def startup_event():
     try:
-        # This now uses the logic from telegram_logic.py
+        # Uses the logic imported from telegram_logic.py
         await ensure_connected()
-        logger.info("✅ TELEGRAM_BOT: ONLINE.")
+        logger.info("✅ TELEGRAM_CONNECTION: SUCCESS")
     except Exception as e:
         logger.error(f"❌ STARTUP_ERROR: {e}")
 
@@ -80,28 +78,30 @@ async def delete_video(video_id: str, admin_data: dict = Depends(verify_admin)):
 # --- PUBLIC LIST & STREAM ---
 @app.get("/api/videos/list")
 async def list_videos():
-    response = supabase.table("videos").select("id, title, tg_file_ids, category").execute()
-    return {"status": "success", "data": response.data}
+    try:
+        response = supabase.table("videos").select("id, title, tg_file_ids, category").execute()
+        return {"status": "success", "data": response.data}
+    except Exception as e:
+        logger.error(f"LIST_ERROR: {e}")
+        return {"status": "error", "data": []}
 
 @app.get("/api/video/stream/{message_id}")
 async def video_stream(message_id: str, request: Request):
     try:
-        # 1. Force connection check
+        # Ensure client is connected before streaming
         await ensure_connected()
 
         async def file_generator():
-            # 1. Immediate Heartbeat to keep the connection open
+            # 1. Heartbeat: Prevents Vercel 10s timeout while fetching metadata
             yield b"" 
             
             try:
-                # 2. Get the stream
                 async for chunk in stream_telegram_file(message_id):
                     if chunk:
                         yield chunk
             except Exception as e:
-                logger.error(f"Generator Error: {e}")
+                logger.error(f"Stream Generator Error: {e}")
 
-        # 3. Add 'Accept-Ranges' to satisfy Chrome/Safari players
         return StreamingResponse(
             file_generator(),
             media_type="video/mp4",
@@ -114,12 +114,15 @@ async def video_stream(message_id: str, request: Request):
         )
     except Exception as e:
         logger.error(f"STREAM_INIT_ERROR for {message_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Stream Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Stream Connection Failed")
 
 # --- PAGE ROUTES ---
 @app.get("/")
 async def read_index():
-    return FileResponse(os.path.join(PUBLIC_PATH, "index.html"))
+    path = os.path.join(PUBLIC_PATH, "index.html")
+    if os.path.exists(path):
+        return FileResponse(path)
+    return {"error": "index.html not found"}
 
 @app.get("/login")
 async def get_login_page():
@@ -129,5 +132,6 @@ async def get_login_page():
 async def get_admin_page():
     return FileResponse(os.path.join(PUBLIC_PATH, "admin.html"))
 
+# Mount static files (CSS/JS)
 if os.path.exists(PUBLIC_PATH):
     app.mount("/static", StaticFiles(directory=PUBLIC_PATH), name="static")
