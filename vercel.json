@@ -4,6 +4,10 @@
     {
       "src": "api/main.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -12,16 +16,16 @@
       "dest": "api/main.py"
     },
     {
-      "src": "/css/(.*)",
-      "dest": "/public/css/$1"
+      "src": "/login",
+      "dest": "public/login.html"
     },
     {
-      "src": "/js/(.*)",
-      "dest": "/public/js/$1"
+      "src": "/admin",
+      "dest": "public/admin.html"
     },
     {
       "src": "/(.*)",
-      "dest": "api/main.py"
+      "dest": "public/index.html"
     }
   ]
 }
