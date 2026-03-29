@@ -2,7 +2,7 @@
 
 A high-performance video streaming bridge designed to stream content directly from Telegram channels to a web-based interface. This project is specifically optimized for deployment on Railway.app, utilizing asynchronous streaming and byte-range requests to ensure a stable experience within cloud resource constraints.
 
----
+--- 
 
 ## Technical Overview
 
