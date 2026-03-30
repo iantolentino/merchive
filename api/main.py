@@ -6,14 +6,18 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from loguru import logger
 from dotenv import load_dotenv
+from pathlib import Path
 
 # --- PATH SETUP & ENV VARS ---
-from pathlib import Path
-dotenv_path = Path(__file__).resolve().parent.parent / ".env"
+# Added absolute path calculation to ensure Railway finds the correct 'public' folder
+BASE_DIR = Path(__file__).resolve().parent.parent
+PUBLIC_DIR = BASE_DIR / "public"
+
+dotenv_path = BASE_DIR / ".env"
 load_dotenv(dotenv_path=dotenv_path)
 
 ADMIN_SECRET = os.getenv("ADMIN_SECRET")
-JWT_SECRET = os.getenv("JWT_SECRET") # Ready for future JWT implementation
+JWT_SECRET = os.getenv("JWT_SECRET") 
 
 # --- MODULE RESOLUTION ---
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -37,27 +41,30 @@ class VideoRequest(BaseModel):
     tg_file_ids: list
     is_private: bool
 
-# --- PAGE ROUTING ---
+# --- PAGE ROUTING (With Cache-Busting Headers) ---
 @app.get("/")
 async def read_index():
-    return FileResponse("public/index.html")
+    # Cache-Control headers force the browser to check for new versions
+    return FileResponse(
+        str(PUBLIC_DIR / "index.html"),
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+    )
 
 @app.get("/login")
 async def read_login():
-    return FileResponse("public/login.html")
+    return FileResponse(str(PUBLIC_DIR / "login.html"))
 
 @app.get("/admin")
 async def read_admin():
-    return FileResponse("public/admin.html")
+    return FileResponse(str(PUBLIC_DIR / "admin.html"))
 
 @app.get("/player")
 async def read_player():
-    return FileResponse("public/player.html")
+    return FileResponse(str(PUBLIC_DIR / "player.html"))
 
 # --- API CORE & AUTH ---
 @app.post("/api/auth/login")
 async def login(req: LoginRequest):
-    # Verify against your environment variable
     if req.password == ADMIN_SECRET: 
         return {"access_token": "authorized_admin_token"}
     raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -65,7 +72,6 @@ async def login(req: LoginRequest):
 @app.post("/api/videos/add")
 async def add_video(req: VideoRequest, request: Request):
     token = request.headers.get('Authorization')
-    # Simple token check based on our login response
     if not token or token != "Bearer authorized_admin_token":
         raise HTTPException(status_code=401, detail="Unauthorized")
         
@@ -100,7 +106,6 @@ async def video_stream(message_id: str, request: Request):
         start = 0
         end = file_size - 1
 
-        # Safely parse the exact range requested by mobile browsers (e.g., Safari probe)
         if range_header:
             range_str = range_header.replace("bytes=", "")
             parts = range_str.split("-")
@@ -108,7 +113,6 @@ async def video_stream(message_id: str, request: Request):
             if len(parts) > 1 and parts[1]:
                 end = int(parts[1])
 
-        # Limit max chunk size (2MB) while respecting the requested end byte
         chunk_size = 2 * 1024 * 1024 
         end = min(start + chunk_size - 1, end, file_size - 1)
         
@@ -129,4 +133,5 @@ async def video_stream(message_id: str, request: Request):
         return HTTPException(status_code=500, detail="Internal Server Error")
 
 # --- STATIC ASSETS ---
-app.mount("/public", StaticFiles(directory="public"), name="public")
+# Using the calculated PUBLIC_DIR ensures the mount always points to the right place
+app.mount("/public", StaticFiles(directory=str(PUBLIC_DIR)), name="public")
