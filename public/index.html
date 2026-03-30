@@ -2,47 +2,107 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <title>MERCHIVE</title>
     <style>
-        :root { --accent: #00ff88; --bg: #050505; --card: #111; }
-        body { background: var(--bg); color: #fff; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
-        nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); sticky; top: 0; z-index: 100; border-bottom: 1px solid #1a1a1a; }
-        .logo { font-weight: 900; letter-spacing: 2px; color: var(--accent); text-decoration: none; }
-        .nav-links a { color: #666; text-decoration: none; font-size: 0.8rem; margin-left: 20px; transition: 0.2s; }
+        body { 
+            background: #000; color: #fff; 
+            font-family: 'SF Mono', 'Courier New', monospace; 
+            margin: 0; padding: 0; 
+            text-transform: uppercase; overflow-x: hidden; 
+        }
+        
+        nav { 
+            border-bottom: 1px solid #1a1a1a; padding: 20px; 
+            display: flex; justify-content: space-between; align-items: center; 
+        }
+        .logo { font-weight: 900; letter-spacing: 4px; text-decoration: none; color: #fff; font-size: 16px; }
+        .nav-links a { color: #444; text-decoration: none; font-size: 11px; letter-spacing: 1px; transition: color 0.2s; }
         .nav-links a:hover { color: #fff; }
 
-        .hero { padding: 40px 25px; background: linear-gradient(to bottom, #0a0a0a, #050505); }
-        .search-box { width: 100%; max-width: 500px; background: #1a1a1a; border: 1px solid #333; padding: 12px; border-radius: 8px; color: #fff; outline: none; margin-top: 15px; }
+        .hero { 
+            padding: 40px 20px; border-bottom: 1px solid #1a1a1a; 
+            display: flex; justify-content: center; 
+        }
+        .search-box { 
+            width: 100%; max-width: 600px; background: #000; 
+            border: 1px solid #222; padding: 18px; color: #fff; 
+            font-family: inherit; outline: none; font-size: 16px; 
+            border-radius: 0; appearance: none; transition: border-color 0.3s;
+        }
+        .search-box:focus { border-color: #fff; }
 
-        .container { padding: 25px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
-        .card { background: var(--card); border-radius: 10px; border: 1px solid #222; overflow: hidden; transition: 0.3s; cursor: pointer; }
-        .card:hover { border-color: var(--accent); transform: translateY(-5px); }
-        .card-thumb { height: 100px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
-        .card-body { padding: 12px; }
-        .card-title { font-size: 0.85rem; font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .card-tag { font-size: 0.6rem; color: var(--accent); text-transform: uppercase; margin-top: 5px; display: block; }
+        .container { padding: 30px 20px; }
+        
+        /* Grid Layout */
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
+            gap: 20px; 
+        }
+        
+        @media (max-width: 480px) {
+            .grid { grid-template-columns: 1fr; gap: 15px; }
+            .hero { padding: 25px 15px; }
+        }
 
-        #video-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 2000; flex-direction: column; justify-content: center; }
-        video { width: 100%; max-height: 85vh; }
-        .close-btn { position: absolute; top: 20px; right: 20px; background: #fff; color: #000; border: none; padding: 8px 16px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--accent); pointer-events: none; }
+        /* Card Styling for Readability */
+        .card { 
+            background: #000; 
+            border: 1px solid #1a1a1a; 
+            padding: 25px; 
+            cursor: pointer; 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 140px; 
+            transition: all 0.2s ease-in-out;
+        }
+        .card:hover { border-color: #fff; background: #050505; }
+        
+        .card-title { 
+            font-size: 14px; 
+            font-weight: bold; 
+            margin: 0; 
+            letter-spacing: 1px; 
+            line-height: 1.5; 
+            color: #fff;
+        }
+        
+        .card-tag { 
+            font-size: 10px; 
+            color: #666; 
+            margin-top: 15px; 
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+        }
+        .card-tag::before { content: "•"; margin-right: 8px; color: #fff; }
+
+        /* Fullscreen Player */
+        #video-overlay { 
+            display: none; position: fixed; top: 0; left: 0; 
+            width: 100%; height: 100%; background: #000; 
+            z-index: 1000; flex-direction: column; align-items: center; justify-content: center; 
+        }
+        video { width: 100%; max-height: 75vh; background: #000; border: 1px solid #1a1a1a; }
+        .close-btn { margin-top: 30px; background: #fff; color: #000; border: none; padding: 15px 50px; font-family: inherit; font-weight: bold; cursor: pointer; font-size: 12px; letter-spacing: 2px; }
+        #loader { font-size: 10px; margin-bottom: 20px; letter-spacing: 3px; color: #fff; }
+        
+        .prog { width: 100%; height: 3px; background: #111; position: absolute; bottom: 0; left: 0; }
+        #bar { height: 100%; background: #fff; width: 0%; transition: width 0.1s linear; }
     </style>
 </head>
 <body>
 
     <nav>
         <a href="/" class="logo">MERCHIVE</a>
-        <div class="nav-links">
-            <a href="/login">ADMIN LOGIN</a>
-        </div>
+        <div class="nav-links"><a href="/login">ADMIN_PANEL</a></div>
     </nav>
 
     <div class="hero">
-        <h1 style="margin:0; font-size: 1.5rem;">Discover Content</h1>
-        <input type="text" id="search" class="search-box" placeholder="Search videos or categories..." onkeyup="filterVideos()">
+        <input type="text" id="search" class="search-box" placeholder="TYPE_TO_SEARCH..." onkeyup="filter()">
     </div>
 
     <div class="container">
@@ -50,65 +110,74 @@
     </div>
 
     <div id="video-overlay">
-        <button class="close-btn" onclick="closeStream()">EXIT</button>
-        <div id="loader">BUFFERING...</div>
-        <video id="main-player" controls playsinline crossorigin="anonymous"></video>
+        <div id="loader">HANDSHAKE_TELEGRAM...</div>
+        <video id="player" controls playsinline></video>
+        <div class="prog"><div id="bar"></div></div>
+        <button class="close-btn" onclick="closeV()">EXIT</button>
     </div>
 
     <script>
-        let allVideos = [];
-        const player = document.getElementById('main-player');
-        const overlay = document.getElementById('video-overlay');
-        const loader = document.getElementById('loader');
-
-        player.onplaying = () => loader.style.display = 'none';
-        player.onwaiting = () => loader.style.display = 'block';
+        let data = [];
+        const v = document.getElementById('player');
+        const ov = document.getElementById('video-overlay');
+        const b = document.getElementById('bar');
+        const l = document.getElementById('loader');
 
         async function init() {
-            const res = await fetch('/api/videos/list');
-            const json = await res.json();
-            allVideos = json.data;
-            renderGrid(allVideos);
+            try {
+                const r = await fetch('/api/videos/list');
+                const j = await r.json();
+                data = j.data || [];
+                render(data);
+            } catch (err) {
+                console.error("Fetch error", err);
+            }
         }
 
-        function renderGrid(videos) {
-            const grid = document.getElementById('grid');
-            grid.innerHTML = '';
-            videos.forEach(v => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <div class="card-thumb">🎬</div>
-                    <div class="card-body">
-                        <p class="card-title">${v.title}</p>
-                        <span class="card-tag">${v.category || 'Clip'}</span>
-                    </div>
-                `;
-                card.onclick = () => openStream(v.tg_file_ids[0]);
-                grid.appendChild(card);
+        function render(items) {
+            const g = document.getElementById('grid');
+            if (!items.length) {
+                g.innerHTML = '<div style="padding:40px; color:#444; font-size:11px; letter-spacing:2px;">NULL_RESULTS</div>';
+                return;
+            }
+            g.innerHTML = items.map(i => `
+                <div class="card" onclick="openV('${i.tg_file_ids[0]}')">
+                    <p class="card-title">${i.title}</p>
+                    <span class="card-tag">${i.category || 'GENERAL'}</span>
+                </div>
+            `).join('');
+        }
+
+        function openV(id) {
+            ov.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            v.src = `/api/video/stream/${id}`;
+            v.load();
+            v.play().catch(e => {
+                l.innerText = "STREAM_INTERRUPTED";
+                console.log(e);
             });
         }
 
-        function filterVideos() {
-            const query = document.getElementById('search').value.toLowerCase();
-            const filtered = allVideos.filter(v => 
-                v.title.toLowerCase().includes(query) || 
-                (v.category && v.category.toLowerCase().includes(query))
+        function closeV() {
+            v.pause();
+            v.src = "";
+            ov.style.display = 'none';
+            document.body.style.overflow = 'auto';
+            l.innerText = "HANDSHAKE_TELEGRAM...";
+        }
+
+        v.ontimeupdate = () => b.style.width = (v.currentTime / v.duration) * 100 + '%';
+        v.onplaying = () => l.style.display = 'none';
+        v.onwaiting = () => { l.innerText = "WAITING_FOR_DATA..."; l.style.display = 'block'; };
+
+        function filter() {
+            const q = document.getElementById('search').value.toLowerCase();
+            const filtered = data.filter(i => 
+                i.title.toLowerCase().includes(q) || 
+                (i.category && i.category.toLowerCase().includes(q))
             );
-            renderGrid(filtered);
-        }
-
-        function openStream(id) {
-            overlay.style.display = 'flex';
-            loader.style.display = 'block';
-            player.src = `/api/video/stream/${id}`;
-            player.play();
-        }
-
-        function closeStream() {
-            player.pause();
-            player.src = "";
-            overlay.style.display = 'none';
+            render(filtered);
         }
 
         init();
