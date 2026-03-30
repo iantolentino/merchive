@@ -55,7 +55,8 @@
                 if (res.ok) {
                     const data = await res.json();
                     localStorage.setItem('access_token', data.access_token);
-                    window.location.href = '/'; // Send to admin panel
+                    // Fixed: Redirects to admin panel on success
+                    window.location.href = '/admin'; 
                 } else {
                     errorMsg.style.display = 'block';
                 }
