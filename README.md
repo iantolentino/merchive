@@ -16,7 +16,7 @@ Merchive acts as a transparent proxy between Telegram's servers and the client's
 
 ---
 
-## Project Structure
+## Project Structure 
 
 ```text
 merchive/
